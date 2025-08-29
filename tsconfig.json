@@ -28,8 +28,11 @@
       "@shared/*": ["src/shared/*"],
       "@content/*": ["src/content/*"],
       "@types/*": ["src/types/*"]
-    }
+    },
+
+    /* Types */
+    "types": ["vite/client"]
   },
-  "include": ["src"],
+  "include": ["src", "src/vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

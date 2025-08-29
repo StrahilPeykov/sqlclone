@@ -1,7 +1,7 @@
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import { Box, Paper } from '@mui/material';
 
 interface SQLEditorProps {
@@ -45,7 +45,7 @@ export function SQLEditor({
   // Add keyboard shortcut for execution
   if (onExecute) {
     extensions.push(
-      EditorView.keymap.of([
+      keymap.of([
         {
           key: 'Ctrl-Enter',
           mac: 'Cmd-Enter',

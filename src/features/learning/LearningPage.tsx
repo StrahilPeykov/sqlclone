@@ -1,47 +1,43 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
+  Container,
   Box,
-  Tabs,
-  Tab,
   Typography,
   Button,
   Alert,
-  LinearProgress,
   Chip,
+  Card,
+  CardContent,
+  Grid,
 } from '@mui/material';
 import {
-  Book,
-  Lightbulb,
-  Code,
   ArrowForward,
   ArrowBack,
   CheckCircle,
+  School,
+  Code,
 } from '@mui/icons-material';
-import ReactMarkdown from 'react-markdown';
 import { useAppStore } from '@/store';
-import { useContent, useComponentDependencies } from '@/features/content/ContentLoader';
+import { useContent, useComponentDependencies, useAllComponents } from '@/features/content/ContentLoader';
 import { LoadingScreen } from '@/shared/components/LoadingScreen';
-import { SQLDisplay } from '@/shared/components/SQLEditor';
 
 export default function LearningPage() {
-  const { componentId, tab } = useParams<{ componentId: string; tab?: string }>();
+  const { componentId } = useParams<{ componentId: string }>();
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState(tab || 'theory');
-  
   const updateProgress = useAppStore((state) => state.updateProgress);
   const user = useAppStore((state) => state.user);
-  const progress = user?.progress[componentId!];
+  
+  // If no componentId, show component list
+  if (!componentId) {
+    return <ComponentList />;
+  }
+  
+  const progress = user?.progress[componentId];
   
   // Load content and dependencies
-  const { data: component, isLoading, error } = useContent(componentId!);
-  const { data: dependencies } = useComponentDependencies(componentId!);
-  
-  useEffect(() => {
-    if (tab !== currentTab) {
-      navigate(`/learn/${componentId}/${currentTab}`, { replace: true });
-    }
-  }, [currentTab, tab, componentId, navigate]);
+  const { data: component, isLoading, error } = useContent(componentId);
+  const { data: dependencies } = useComponentDependencies(componentId);
   
   // Update last accessed
   useEffect(() => {
@@ -56,18 +52,20 @@ export default function LearningPage() {
   
   if (error || !component) {
     return (
-      <Alert severity="error">
-        Failed to load content. Please try again later.
-      </Alert>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="error">
+          Failed to load content. Please try again later.
+        </Alert>
+      </Container>
     );
   }
   
   const isCompleted = progress?.completed || false;
   const isConcept = component.meta.type === 'concept';
-  const content = component.content as any;
+  const content = component.content;
   
   const handleComplete = () => {
-    updateProgress(componentId!, {
+    updateProgress(componentId, {
       completed: true,
       type: component.meta.type,
     });
@@ -77,142 +75,8 @@ export default function LearningPage() {
     navigate(`/practice/${componentId}`);
   };
   
-  const renderTabContent = () => {
-    switch (currentTab) {
-      case 'theory':
-        return (
-          <Box>
-            {content.theory ? (
-              <ReactMarkdown
-                components={{
-                  code: ({ children, className }) => {
-                    const isInline = !className;
-                    const language = className?.replace('language-', '');
-                    
-                    if (isInline) {
-                      return <code className="inline-code">{children}</code>;
-                    }
-                    
-                    if (language === 'sql') {
-                      return <SQLDisplay>{String(children)}</SQLDisplay>;
-                    }
-                    
-                    return (
-                      <pre className="code-block">
-                        <code>{children}</code>
-                      </pre>
-                    );
-                  },
-                }}
-              >
-                {content.theory}
-              </ReactMarkdown>
-            ) : (
-              <Typography>No theory content available.</Typography>
-            )}
-          </Box>
-        );
-      
-      case 'summary':
-        return (
-          <Box>
-            {content.summary ? (
-              <ReactMarkdown>{content.summary}</ReactMarkdown>
-            ) : (
-              <Typography>No summary available.</Typography>
-            )}
-          </Box>
-        );
-      
-      case 'examples':
-        return (
-          <Box>
-            {content.examples && content.examples.length > 0 ? (
-              content.examples.map((example: any, index: number) => (
-                <Box key={index} sx={{ mb: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    {example.title}
-                  </Typography>
-                  <ReactMarkdown>{example.content}</ReactMarkdown>
-                </Box>
-              ))
-            ) : (
-              <Typography>No examples available.</Typography>
-            )}
-          </Box>
-        );
-      
-      case 'reference':
-        if (!content.reference) {
-          return <Typography>No reference available.</Typography>;
-        }
-        
-        return (
-          <Box>
-            {content.reference.syntax && (
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Syntax
-                </Typography>
-                <SQLDisplay>{content.reference.syntax}</SQLDisplay>
-              </Box>
-            )}
-            
-            {content.reference.examples && (
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Examples
-                </Typography>
-                {content.reference.examples.map((ex: any, i: number) => (
-                  <Box key={i} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      {ex.title}
-                    </Typography>
-                    <SQLDisplay>{ex.sql}</SQLDisplay>
-                    {ex.description && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {ex.description}
-                      </Typography>
-                    )}
-                  </Box>
-                ))}
-              </Box>
-            )}
-            
-            {content.reference.commonMistakes && (
-              <Box>
-                <Typography variant="h6" gutterBottom>
-                  Common Mistakes
-                </Typography>
-                {content.reference.commonMistakes.map((mistake: any, i: number) => (
-                  <Alert key={i} severity="warning" sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      ❌ {mistake.mistake}
-                    </Typography>
-                    <Typography variant="body2">
-                      ✅ {mistake.correction}
-                    </Typography>
-                  </Alert>
-                ))}
-              </Box>
-            )}
-          </Box>
-        );
-      
-      default:
-        return null;
-    }
-  };
-  
-  // Determine available tabs
-  const tabs = [];
-  if (content.theory) tabs.push({ value: 'theory', label: 'Theory', icon: Book });
-  if (content.summary) tabs.push({ value: 'summary', label: 'Summary', icon: Lightbulb });
-  if (content.examples) tabs.push({ value: 'examples', label: 'Examples', icon: Code });
-  if (content.reference) tabs.push({ value: 'reference', label: 'Reference', icon: Book });
-  
   return (
-    <Box>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -254,56 +118,58 @@ export default function LearningPage() {
         </Alert>
       )}
       
-      {/* Progress Bar for Skills */}
-      {!isConcept && progress?.exercisesCompleted !== undefined && (
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Exercises Progress
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {progress.exercisesCompleted}/3
-            </Typography>
-          </Box>
-          <LinearProgress
-            variant="determinate"
-            value={(progress.exercisesCompleted / 3) * 100}
-            sx={{ height: 6, borderRadius: 3 }}
-          />
-        </Box>
-      )}
-      
-      {/* Tabs */}
-      {tabs.length > 1 && (
-        <Tabs
-          value={currentTab}
-          onChange={(_, value) => setCurrentTab(value)}
-          sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-        >
-          {tabs.map((tab) => (
-            <Tab
-              key={tab.value}
-              value={tab.value}
-              label={tab.label}
-              icon={<tab.icon />}
-              iconPosition="start"
-            />
-          ))}
-        </Tabs>
-      )}
-      
       {/* Content */}
-      <Box sx={{ mb: 4 }}>
-        {renderTabContent()}
-      </Box>
+      <Card sx={{ mb: 4 }}>
+        <CardContent sx={{ p: 4 }}>
+          {content.theory && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Theory
+              </Typography>
+              <Typography variant="body1" paragraph>
+                {content.theory}
+              </Typography>
+            </Box>
+          )}
+          
+          {content.summary && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Summary
+              </Typography>
+              <Typography variant="body1" paragraph>
+                {content.summary}
+              </Typography>
+            </Box>
+          )}
+          
+          {content.examples && content.examples.length > 0 && (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Examples
+              </Typography>
+              {content.examples.map((example: any, index: number) => (
+                <Box key={index} sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    {example.title}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {example.content}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
       
       {/* Action Buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/learn')}
         >
-          Previous
+          Back to Learning
         </Button>
         
         <Box sx={{ display: 'flex', gap: 2 }}>
@@ -337,6 +203,115 @@ export default function LearningPage() {
           )}
         </Box>
       </Box>
-    </Box>
+    </Container>
+  );
+}
+
+// Component to show list of available components
+function ComponentList() {
+  const navigate = useNavigate();
+  const { data: components = [] } = useAllComponents();
+  const user = useAppStore((state) => state.user);
+  
+  const concepts = components.filter(c => c.type === 'concept');
+  const skills = components.filter(c => c.type === 'skill');
+  
+  const isCompleted = (componentId: string) => {
+    return user?.progress[componentId]?.completed || false;
+  };
+  
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Learning Path
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+        Master SQL through concepts and hands-on practice
+      </Typography>
+      
+      <Grid container spacing={4}>
+        {/* Concepts */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <School sx={{ mr: 1, color: 'primary.main' }} />
+                <Typography variant="h6">Concepts</Typography>
+              </Box>
+              {concepts.map((concept) => (
+                <Box
+                  key={concept.id}
+                  sx={{
+                    p: 2,
+                    mb: 1,
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                    },
+                  }}
+                  onClick={() => navigate(`/learn/${concept.id}`)}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">
+                      {concept.name}
+                    </Typography>
+                    {isCompleted(concept.id) && (
+                      <CheckCircle color="success" fontSize="small" />
+                    )}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {concept.description}
+                  </Typography>
+                </Box>
+              ))}
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Skills */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Code sx={{ mr: 1, color: 'secondary.main' }} />
+                <Typography variant="h6">Skills</Typography>
+              </Box>
+              {skills.map((skill) => (
+                <Box
+                  key={skill.id}
+                  sx={{
+                    p: 2,
+                    mb: 1,
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                    },
+                  }}
+                  onClick={() => navigate(`/learn/${skill.id}`)}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">
+                      {skill.name}
+                    </Typography>
+                    {isCompleted(skill.id) && (
+                      <CheckCircle color="success" fontSize="small" />
+                    )}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {skill.description}
+                  </Typography>
+                </Box>
+              ))}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
   );
 }

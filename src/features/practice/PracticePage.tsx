@@ -229,13 +229,13 @@ export default function PracticePage() {
             <Step key={exercise.id} completed={result?.completed}>
               <StepLabel
                 error={result && !result.completed}
-                StepIconComponent={
-                  result
+                slots={{
+                  stepIcon: result
                     ? result.completed
                       ? CheckCircle
                       : Cancel
                     : undefined
-                }
+                }}
               >
                 {exercise.difficulty}
               </StepLabel>
@@ -250,7 +250,7 @@ export default function PracticePage() {
           ...currentExercise,
           title: `Exercise ${current + 1}`,
           database: currentExercise.config?.database || 'basic',
-          schema: databaseConfigs[currentExercise.config?.database || 'basic'].schema,
+          schema: databaseConfigs[currentExercise.config?.database as keyof typeof databaseConfigs || 'basic'].schema,
         }}
         onComplete={handleExerciseComplete}
       />

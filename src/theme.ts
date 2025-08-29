@@ -63,9 +63,6 @@ export const theme = createTheme({
       fontSize: '0.875rem',
       lineHeight: 1.5,
     },
-    code: {
-      fontFamily: '"Fira Code", "Courier New", monospace',
-    },
   },
   shape: {
     borderRadius: 8,

@@ -8,6 +8,7 @@ import {
   Chip,
   List,
   ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Paper,
@@ -268,31 +269,31 @@ export default function ProgressPage() {
               {recentActivity.length > 0 ? (
                 <List>
                   {recentActivity.map((activity) => (
-                    <ListItem
-                      key={activity.id}
-                      button
-                      onClick={() => navigate(`/learn/${activity.id}`)}
-                    >
-                      <ListItemIcon>
-                        {activity.completed ? (
-                          <CheckCircle color="success" />
-                        ) : (
-                          <RadioButtonUnchecked />
-                        )}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={activity.component?.name || activity.componentId}
-                        secondary={
-                          activity.lastAccessed
-                            ? new Date(activity.lastAccessed).toLocaleDateString()
-                            : 'Never accessed'
-                        }
-                      />
-                      <Chip
-                        label={activity.type}
-                        size="small"
-                        color={activity.type === 'concept' ? 'primary' : 'secondary'}
-                      />
+                    <ListItem key={activity.id} disablePadding>
+                      <ListItemButton
+                        onClick={() => navigate(`/learn/${activity.id}`)}
+                      >
+                        <ListItemIcon>
+                          {activity.completed ? (
+                            <CheckCircle color="success" />
+                          ) : (
+                            <RadioButtonUnchecked />
+                          )}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={activity.component?.name || activity.componentId}
+                          secondary={
+                            activity.lastAccessed
+                              ? new Date(activity.lastAccessed).toLocaleDateString()
+                              : 'Never accessed'
+                          }
+                        />
+                        <Chip
+                          label={activity.type}
+                          size="small"
+                          color={activity.type === 'concept' ? 'primary' : 'secondary'}
+                        />
+                      </ListItemButton>
                     </ListItem>
                   ))}
                 </List>

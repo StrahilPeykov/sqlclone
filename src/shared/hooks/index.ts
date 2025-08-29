@@ -211,7 +211,7 @@ export function useQueryParams<T extends Record<string, string>>() {
  * usePrevious - Store the previous value of a variable
  */
 export function usePrevious<T>(value: T): T | undefined {
-  const ref = useRef<T>();
+  const ref = useRef<T | undefined>(undefined);
   
   useEffect(() => {
     ref.current = value;

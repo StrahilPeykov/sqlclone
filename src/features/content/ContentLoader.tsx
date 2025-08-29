@@ -1,228 +1,156 @@
-import { Component, ComponentMeta, ConceptContent, SkillContent } from './types';
+// Simple mock content loader for testing
+import { useState, useEffect } from 'react';
 
-/**
- * ContentLoader - Manages loading and caching of educational content
- * Content is stored in JSON files for easy editing and version control
- */
-class ContentLoader {
-  private static instance: ContentLoader;
-  private cache: Map<string, Component> = new Map();
-  private metadata: Map<string, ComponentMeta> = new Map();
-  
-  private constructor() {}
-  
-  static getInstance(): ContentLoader {
-    if (!ContentLoader.instance) {
-      ContentLoader.instance = new ContentLoader();
-    }
-    return ContentLoader.instance;
-  }
-  
-  /**
-   * Initialize the content loader with metadata
-   */
-  async initialize(): Promise<void> {
-    try {
-      // Load component metadata index
-      const response = await fetch('/content/index.json');
-      const index = await response.json();
-      
-      // Store metadata for quick access
-      index.forEach((meta: ComponentMeta) => {
-        this.metadata.set(meta.id, meta);
-      });
-    } catch (error) {
-      console.error('Failed to load content index:', error);
-      throw new Error('Content initialization failed');
-    }
-  }
-  
-  /**
-   * Get all available components metadata
-   */
-  getAllComponents(): ComponentMeta[] {
-    return Array.from(this.metadata.values());
-  }
-  
-  /**
-   * Get components filtered by type
-   */
-  getComponentsByType(type: 'concept' | 'skill'): ComponentMeta[] {
-    return this.getAllComponents().filter(c => c.type === type);
-  }
-  
-  /**
-   * Load a specific component
-   */
-  async loadComponent(id: string): Promise<Component> {
-    // Check cache first
-    if (this.cache.has(id)) {
-      return this.cache.get(id)!;
-    }
-    
-    // Get metadata
-    const meta = this.metadata.get(id);
-    if (!meta) {
-      throw new Error(`Component "${id}" not found`);
-    }
-    
-    try {
-      // Load content based on type
-      const contentPath = `/content/${meta.type}s/${id}/content.json`;
-      const response = await fetch(contentPath);
-      const content = await response.json();
-      
-      const component: Component = {
-        meta,
-        content: content as ConceptContent | SkillContent,
-      };
-      
-      // Cache the component
-      this.cache.set(id, component);
-      
-      return component;
-    } catch (error) {
-      console.error(`Failed to load component "${id}":`, error);
-      throw new Error(`Failed to load component "${id}"`);
-    }
-  }
-  
-  /**
-   * Get component dependencies (prerequisites and follow-ups)
-   */
-  getComponentDependencies(id: string): {
-    prerequisites: ComponentMeta[];
-    followUps: ComponentMeta[];
-  } {
-    const component = this.metadata.get(id);
-    if (!component) {
-      return { prerequisites: [], followUps: [] };
-    }
-    
-    // Get prerequisites
-    const prerequisites = component.prerequisites
-      .map(prereqId => this.metadata.get(prereqId))
-      .filter(Boolean) as ComponentMeta[];
-    
-    // Get follow-ups (components that have this as prerequisite)
-    const followUps = this.getAllComponents().filter(c =>
-      c.prerequisites.includes(id)
-    );
-    
-    return { prerequisites, followUps };
-  }
-  
-  /**
-   * Build a learning path from current component to target
-   */
-  buildLearningPath(fromId: string, toId: string): string[] {
-    // Simple BFS to find path
-    const visited = new Set<string>();
-    const queue: { id: string; path: string[] }[] = [
-      { id: fromId, path: [fromId] },
-    ];
-    
-    while (queue.length > 0) {
-      const { id, path } = queue.shift()!;
-      
-      if (id === toId) {
-        return path;
-      }
-      
-      if (visited.has(id)) continue;
-      visited.add(id);
-      
-      const { followUps } = this.getComponentDependencies(id);
-      for (const followUp of followUps) {
-        queue.push({
-          id: followUp.id,
-          path: [...path, followUp.id],
-        });
-      }
-    }
-    
-    return []; // No path found
-  }
-  
-  /**
-   * Get recommended next components based on completed ones
-   */
-  getRecommendations(completedIds: string[]): ComponentMeta[] {
-    const completed = new Set(completedIds);
-    const recommendations: ComponentMeta[] = [];
-    
-    for (const component of this.getAllComponents()) {
-      // Skip if already completed
-      if (completed.has(component.id)) continue;
-      
-      // Check if all prerequisites are completed
-      const allPrerequisitesMet = component.prerequisites.every(prereq =>
-        completed.has(prereq)
-      );
-      
-      if (allPrerequisitesMet) {
-        recommendations.push(component);
-      }
-    }
-    
-    // Sort by difficulty and estimated time
-    recommendations.sort((a, b) => {
-      const difficultyOrder = { beginner: 0, intermediate: 1, advanced: 2 };
-      const aDiff = difficultyOrder[a.difficulty || 'beginner'];
-      const bDiff = difficultyOrder[b.difficulty || 'beginner'];
-      
-      if (aDiff !== bDiff) return aDiff - bDiff;
-      
-      return (a.estimatedTime || 0) - (b.estimatedTime || 0);
-    });
-    
-    return recommendations;
-  }
-  
-  /**
-   * Clear cache
-   */
-  clearCache(): void {
-    this.cache.clear();
-  }
+export interface ComponentMeta {
+  id: string;
+  name: string;
+  type: 'concept' | 'skill';
+  description?: string;
+  prerequisites: string[];
+  estimatedTime?: number;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
 }
 
-export const contentLoader = ContentLoader.getInstance();
+export interface Component {
+  meta: ComponentMeta;
+  content: any;
+}
 
-// React hooks for content loading
-import { useQuery } from '@tanstack/react-query';
+// Mock data for testing
+const mockComponents: ComponentMeta[] = [
+  {
+    id: 'database',
+    name: 'What is a Database?',
+    type: 'concept',
+    description: 'Learn the fundamentals of databases and why they are important',
+    prerequisites: [],
+    estimatedTime: 15,
+    difficulty: 'beginner',
+  },
+  {
+    id: 'tables',
+    name: 'Database Tables',
+    type: 'concept',
+    description: 'Understand how data is organized in tables',
+    prerequisites: ['database'],
+    estimatedTime: 20,
+    difficulty: 'beginner',
+  },
+  {
+    id: 'select-basics',
+    name: 'SELECT Statements',
+    type: 'skill',
+    description: 'Learn to query data from database tables',
+    prerequisites: ['tables'],
+    estimatedTime: 30,
+    difficulty: 'beginner',
+  },
+  {
+    id: 'filtering',
+    name: 'Filtering Data',
+    type: 'skill',
+    description: 'Use WHERE clauses to filter your results',
+    prerequisites: ['select-basics'],
+    estimatedTime: 25,
+    difficulty: 'beginner',
+  },
+  {
+    id: 'joins',
+    name: 'Table Joins',
+    type: 'skill',
+    description: 'Combine data from multiple tables',
+    prerequisites: ['filtering'],
+    estimatedTime: 45,
+    difficulty: 'intermediate',
+  },
+];
 
+// Mock hook implementations
 export function useContent(componentId: string) {
-  return useQuery({
-    queryKey: ['content', componentId],
-    queryFn: () => contentLoader.loadComponent(componentId),
-    staleTime: Infinity, // Content doesn't change often
-  });
+  const [data, setData] = useState<Component | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    // Simulate loading
+    const timer = setTimeout(() => {
+      const meta = mockComponents.find(c => c.id === componentId);
+      if (meta) {
+        setData({
+          meta,
+          content: {
+            theory: `This is the theory content for ${meta.name}. In a real implementation, this would be loaded from your content files.`,
+            summary: `Summary of ${meta.name}: This concept is important for understanding SQL databases.`,
+            examples: [
+              {
+                title: 'Basic Example',
+                content: `Here's how ${meta.name} works in practice.`
+              }
+            ]
+          }
+        });
+      } else {
+        setError('Component not found');
+      }
+      setIsLoading(false);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [componentId]);
+  
+  return { data, isLoading, error };
 }
 
 export function useAllComponents() {
-  return useQuery({
-    queryKey: ['components'],
-    queryFn: async () => {
-      await contentLoader.initialize();
-      return contentLoader.getAllComponents();
-    },
-    staleTime: Infinity,
-  });
+  const [data, setData] = useState<ComponentMeta[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    // Simulate loading
+    const timer = setTimeout(() => {
+      setData(mockComponents);
+      setIsLoading(false);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  return { data, isLoading };
 }
 
 export function useComponentDependencies(componentId: string) {
-  return useQuery({
-    queryKey: ['dependencies', componentId],
-    queryFn: () => contentLoader.getComponentDependencies(componentId),
-    staleTime: Infinity,
-  });
+  const [data, setData] = useState<{
+    prerequisites: ComponentMeta[];
+    followUps: ComponentMeta[];
+  }>({ prerequisites: [], followUps: [] });
+  
+  useEffect(() => {
+    const component = mockComponents.find(c => c.id === componentId);
+    if (component) {
+      const prerequisites = mockComponents.filter(c => 
+        component.prerequisites.includes(c.id)
+      );
+      const followUps = mockComponents.filter(c =>
+        c.prerequisites.includes(componentId)
+      );
+      setData({ prerequisites, followUps });
+    }
+  }, [componentId]);
+  
+  return { data };
 }
 
 export function useRecommendations(completedIds: string[]) {
-  return useQuery({
-    queryKey: ['recommendations', completedIds],
-    queryFn: () => contentLoader.getRecommendations(completedIds),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const [data, setData] = useState<ComponentMeta[]>([]);
+  
+  useEffect(() => {
+    const completed = new Set(completedIds);
+    const recommendations = mockComponents.filter(component => {
+      if (completed.has(component.id)) return false;
+      return component.prerequisites.every(prereq => completed.has(prereq));
+    });
+    setData(recommendations.slice(0, 3)); // Top 3 recommendations
+  }, [completedIds]);
+  
+  return { data };
 }
