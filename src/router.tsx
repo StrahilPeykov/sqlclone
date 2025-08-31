@@ -3,16 +3,13 @@ import { Suspense } from 'react';
 import { LoadingScreen } from '@/shared/components/LoadingScreen';
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
 
-// Import components directly instead of lazy loading for now to avoid import issues
+// Import components
 import HomePage from '@/features/home/HomePage';
-import LearningPage from '@/features/learning/LearningPage';
-import PracticePage from '@/features/practice/PracticePage';
+import LearningOverviewPage from '@/features/learning/LearningOverviewPage';
+import ConceptPage from '@/features/learning/ConceptPage';
+import SkillPage from '@/features/learning/SkillPage';
 import PlaygroundPage from '@/features/playground/PlaygroundPage';
-import ProgressPage from '@/features/progress/ProgressPage';
 import { Layout } from '@/features/layout/Layout';
-
-// Simple fallback components for pages that might not be ready
-// Simple placeholders removed in favor of real pages
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -45,47 +42,23 @@ export const router = createBrowserRouter([
         path: 'learn',
         element: (
           <SuspenseWrapper>
-            <LearningPage />
+            <LearningOverviewPage />
           </SuspenseWrapper>
         ),
       },
       {
-        path: 'learn/:componentId',
+        path: 'concept/:conceptId',
         element: (
           <SuspenseWrapper>
-            <LearningPage />
+            <ConceptPage />
           </SuspenseWrapper>
         ),
       },
       {
-        path: 'learn/:componentId/:tab',
+        path: 'skill/:skillId',
         element: (
           <SuspenseWrapper>
-            <LearningPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'practice',
-        element: (
-          <SuspenseWrapper>
-            <PracticePage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'practice/:skillId',
-        element: (
-          <SuspenseWrapper>
-            <PracticePage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'progress',
-        element: (
-          <SuspenseWrapper>
-            <ProgressPage />
+            <SkillPage />
           </SuspenseWrapper>
         ),
       },

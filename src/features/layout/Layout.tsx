@@ -12,8 +12,6 @@ import {
 import {
   Home as HomeIcon,
   School as LearnIcon,
-  Code as PracticeIcon,
-  Timeline as ProgressIcon,
   PlayArrow as PlaygroundIcon,
 } from '@mui/icons-material';
 import { DarkMode, LightMode } from '@mui/icons-material';
@@ -28,8 +26,6 @@ export function Layout() {
   const navItems = [
     { path: '/', label: 'Home', icon: HomeIcon },
     { path: '/learn', label: 'Learn', icon: LearnIcon },
-    { path: '/practice', label: 'Practice', icon: PracticeIcon },
-    { path: '/progress', label: 'Progress', icon: ProgressIcon },
     { path: '/playground', label: 'Playground', icon: PlaygroundIcon },
   ];
   

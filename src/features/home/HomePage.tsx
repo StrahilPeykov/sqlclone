@@ -12,8 +12,6 @@ import {
   PlayArrow,
   School,
   Code,
-  Timeline,
-  EmojiEvents,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -76,7 +74,7 @@ export default function HomePage() {
       
       {/* Features Grid */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
             <CardContent sx={{ p: 4 }}>
               <School sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
@@ -84,7 +82,7 @@ export default function HomePage() {
                 Learn Concepts
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Start with the fundamentals: databases, tables, and SQL basics
+                Master database fundamentals: tables, keys, data types, and more
               </Typography>
               <Button
                 variant="outlined"
@@ -97,43 +95,22 @@ export default function HomePage() {
           </Card>
         </Grid>
         
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
             <CardContent sx={{ p: 4 }}>
-              <Code sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+              <Code sx={{ fontSize: 60, color: 'secondary.main', mb: 2 }} />
               <Typography variant="h5" gutterBottom>
                 Practice Skills
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Apply your knowledge with interactive coding exercises
+                Apply your knowledge with hands-on SQL exercises and real databases
               </Typography>
               <Button
                 variant="outlined"
-                onClick={() => navigate('/practice')}
+                onClick={() => navigate('/learn')}
                 fullWidth
               >
                 Start Practicing
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%', textAlign: 'center' }}>
-            <CardContent sx={{ p: 4 }}>
-              <Timeline sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h5" gutterBottom>
-                Track Progress
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Monitor your learning journey and achievements
-              </Typography>
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/progress')}
-                fullWidth
-              >
-                View Progress
               </Button>
             </CardContent>
           </Card>
