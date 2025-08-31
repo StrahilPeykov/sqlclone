@@ -11,6 +11,9 @@ import { ErrorBoundary } from './shared/components/ErrorBoundary';
 import type { PaletteMode } from '@mui/material';
 import { useLocalStorage } from '@/shared/hooks';
 
+// Import the missing providers
+import { LocalStorageManager, SQLJSProvider, SkillDatabaseProvider } from '@/shared/providers';
+
 // Create a query client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,17 +49,23 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ColorModeContext.Provider value={colorMode}>
-          <ThemeProvider theme={theme}>
-            <CssBaseline />
-            <Suspense fallback={<LoadingScreen fullScreen />}>
-              <RouterProvider router={router} />
-            </Suspense>
-            {import.meta.env.DEV && <ReactQueryDevtools />}
-          </ThemeProvider>
-        </ColorModeContext.Provider>
-      </QueryClientProvider>
+      <LocalStorageManager>
+        <SQLJSProvider>
+          <SkillDatabaseProvider>
+            <QueryClientProvider client={queryClient}>
+              <ColorModeContext.Provider value={colorMode}>
+                <ThemeProvider theme={theme}>
+                  <CssBaseline />
+                  <Suspense fallback={<LoadingScreen fullScreen />}>
+                    <RouterProvider router={router} />
+                  </Suspense>
+                  {import.meta.env.DEV && <ReactQueryDevtools />}
+                </ThemeProvider>
+              </ColorModeContext.Provider>
+            </QueryClientProvider>
+          </SkillDatabaseProvider>
+        </SQLJSProvider>
+      </LocalStorageManager>
     </ErrorBoundary>
   );
 }

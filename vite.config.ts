@@ -26,6 +26,11 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, './src/shared'),
       '@content': path.resolve(__dirname, './src/content'),
       '@types': path.resolve(__dirname, './src/types'),
+      'components': path.resolve(__dirname, './src/shared/components'),
+      'util': path.resolve(__dirname, './src/shared/utils'),
+      'edu': path.resolve(__dirname, './src/features/content'),
+      'eduComponents': path.resolve(__dirname, './src/features/learning'),
+      'content': path.resolve(__dirname, './src/content'),
     },
   },
   server: {
