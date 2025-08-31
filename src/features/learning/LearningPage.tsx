@@ -28,16 +28,10 @@ export default function LearningPage() {
   const updateProgress = useAppStore((state) => state.updateProgress);
   const user = useAppStore((state) => state.user);
   
-  // If no componentId, show component list
-  if (!componentId) {
-    return <ComponentList />;
-  }
-  
-  const progress = user?.progress[componentId];
-  
-  // Load content and dependencies
-  const { data: component, isLoading, error } = useContent(componentId);
-  const { data: dependencies } = useComponentDependencies(componentId);
+  // Move ALL hook calls to the top, before any conditional logic
+  const { data: component, isLoading, error } = useContent(componentId || '');
+  const { data: dependencies } = useComponentDependencies(componentId || '');
+  const { data: allComponents = [] } = useAllComponents();
   
   // Update last accessed
   useEffect(() => {
@@ -45,6 +39,13 @@ export default function LearningPage() {
       updateProgress(componentId, { lastAccessed: new Date() });
     }
   }, [componentId, updateProgress]);
+  
+  // If no componentId, show component list
+  if (!componentId) {
+    return <ComponentList allComponents={allComponents} />;
+  }
+  
+  const progress = user?.progress[componentId];
   
   if (isLoading) {
     return <LoadingScreen />;
@@ -54,7 +55,9 @@ export default function LearningPage() {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error">
-          Failed to load content. Please try again later.
+          Failed to load content for "{componentId}". Please try again later.
+          <br />
+          <small>Available components: database, tables, select-basics, filtering, joins</small>
         </Alert>
       </Container>
     );
@@ -208,13 +211,16 @@ export default function LearningPage() {
 }
 
 // Component to show list of available components
-function ComponentList() {
+interface ComponentListProps {
+  allComponents: any[];
+}
+
+function ComponentList({ allComponents }: ComponentListProps) {
   const navigate = useNavigate();
-  const { data: components = [] } = useAllComponents();
   const user = useAppStore((state) => state.user);
   
-  const concepts = components.filter(c => c.type === 'concept');
-  const skills = components.filter(c => c.type === 'skill');
+  const concepts = allComponents.filter(c => c.type === 'concept');
+  const skills = allComponents.filter(c => c.type === 'skill');
   
   const isCompleted = (componentId: string) => {
     return user?.progress[componentId]?.completed || false;

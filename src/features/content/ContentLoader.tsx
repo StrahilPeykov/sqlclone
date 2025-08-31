@@ -72,6 +72,17 @@ export function useContent(componentId: string) {
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
+    // Reset states when componentId changes
+    setData(null);
+    setError(null);
+    setIsLoading(true);
+    
+    // Don't try to load if componentId is empty
+    if (!componentId || componentId.trim() === '') {
+      setIsLoading(false);
+      return;
+    }
+    
     // Simulate loading
     const timer = setTimeout(() => {
       const meta = mockComponents.find(c => c.id === componentId);
@@ -89,8 +100,10 @@ export function useContent(componentId: string) {
             ]
           }
         });
+        setError(null);
       } else {
         setError('Component not found');
+        setData(null);
       }
       setIsLoading(false);
     }, 500);
@@ -125,6 +138,12 @@ export function useComponentDependencies(componentId: string) {
   }>({ prerequisites: [], followUps: [] });
   
   useEffect(() => {
+    // Don't process if componentId is empty
+    if (!componentId || componentId.trim() === '') {
+      setData({ prerequisites: [], followUps: [] });
+      return;
+    }
+    
     const component = mockComponents.find(c => c.id === componentId);
     if (component) {
       const prerequisites = mockComponents.filter(c => 
@@ -134,6 +153,8 @@ export function useComponentDependencies(componentId: string) {
         c.prerequisites.includes(componentId)
       );
       setData({ prerequisites, followUps });
+    } else {
+      setData({ prerequisites: [], followUps: [] });
     }
   }, [componentId]);
   

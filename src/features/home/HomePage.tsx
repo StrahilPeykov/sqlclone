@@ -100,7 +100,7 @@ export default function HomePage() {
         <Grid item xs={12} md={4}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
             <CardContent sx={{ p: 4 }}>
-              <Code sx={{ fontSize: 60, color: 'secondary.main', mb: 2 }} />
+              <Code sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
               <Typography variant="h5" gutterBottom>
                 Practice Skills
               </Typography>
@@ -121,7 +121,7 @@ export default function HomePage() {
         <Grid item xs={12} md={4}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
             <CardContent sx={{ p: 4 }}>
-              <Timeline sx={{ fontSize: 60, color: 'success.main', mb: 2 }} />
+              <Timeline sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
               <Typography variant="h5" gutterBottom>
                 Track Progress
               </Typography>
@@ -139,59 +139,6 @@ export default function HomePage() {
           </Card>
         </Grid>
       </Grid>
-      
-      {/* Quick Stats */}
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="h4" gutterBottom>
-          Your SQL Journey Starts Here
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-          Join thousands of learners mastering SQL through hands-on practice
-        </Typography>
-        
-        <Grid container spacing={4}>
-          <Grid item xs={6} md={3}>
-            <Box>
-              <Typography variant="h3" color="primary.main">
-                15+
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Core Concepts
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Box>
-              <Typography variant="h3" color="secondary.main">
-                50+
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Practice Exercises
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Box>
-              <Typography variant="h3" color="success.main">
-                10+
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Skill Areas
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={6} md={3}>
-            <Box>
-              <Typography variant="h3" color="warning.main">
-                100%
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Free to Use
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
     </Container>
   );
 }

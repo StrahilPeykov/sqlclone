@@ -1,11 +1,13 @@
 import { Outlet } from 'react-router-dom';
-import { 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  Box, 
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Box,
   Button,
-  Container
+  Container,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -14,7 +16,10 @@ import {
   Timeline as ProgressIcon,
   PlayArrow as PlaygroundIcon,
 } from '@mui/icons-material';
+import { DarkMode, LightMode } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useContext } from 'react';
+import { ColorModeContext } from '@/theme';
 
 export function Layout() {
   const navigate = useNavigate();
@@ -75,6 +80,9 @@ export function Layout() {
                 );
               })}
             </Box>
+
+            {/* Theme toggle */}
+            <ThemeToggle />
           </Toolbar>
         </Container>
       </AppBar>
@@ -91,5 +99,17 @@ export function Layout() {
         <Outlet />
       </Box>
     </Box>
+  );
+}
+
+function ThemeToggle() {
+  const { mode, toggleColorMode } = useContext(ColorModeContext);
+  const isLight = mode === 'light';
+  return (
+    <Tooltip title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}>
+      <IconButton color="inherit" onClick={toggleColorMode} aria-label="toggle color mode">
+        {isLight ? <DarkMode /> : <LightMode />}
+      </IconButton>
+    </Tooltip>
   );
 }
