@@ -14,6 +14,13 @@ import { ErrorBoundary } from './shared/components/ErrorBoundary';
 import { useLocalStorage } from './shared/hooks';
 import { DatabaseService } from './features/database/DatabaseService';
 
+// Import the missing providers
+import { 
+  LocalStorageManager, 
+  SQLJSProvider, 
+  SkillDatabaseProvider 
+} from './shared/providers';
+
 // Initialize services
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,17 +62,23 @@ export function App() {
   return (
     <StrictMode>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <ColorModeContext.Provider value={colorMode}>
-            <ThemeProvider theme={theme}>
-              <CssBaseline />
-              <Suspense fallback={<LoadingScreen fullScreen />}>
-                <RouterProvider router={router} />
-              </Suspense>
-              {import.meta.env.DEV && <ReactQueryDevtools />}
-            </ThemeProvider>
-          </ColorModeContext.Provider>
-        </QueryClientProvider>
+        <LocalStorageManager>
+          <SQLJSProvider>
+            <SkillDatabaseProvider>
+              <QueryClientProvider client={queryClient}>
+                <ColorModeContext.Provider value={colorMode}>
+                  <ThemeProvider theme={theme}>
+                    <CssBaseline />
+                    <Suspense fallback={<LoadingScreen fullScreen />}>
+                      <RouterProvider router={router} />
+                    </Suspense>
+                    {import.meta.env.DEV && <ReactQueryDevtools />}
+                  </ThemeProvider>
+                </ColorModeContext.Provider>
+              </QueryClientProvider>
+            </SkillDatabaseProvider>
+          </SQLJSProvider>
+        </LocalStorageManager>
       </ErrorBoundary>
     </StrictMode>
   );
