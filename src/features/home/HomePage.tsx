@@ -76,18 +76,27 @@ export default function HomePage() {
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
-            <CardContent sx={{ p: 4 }}>
-              <School sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h5" gutterBottom>
-                Learn Concepts
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Master database fundamentals: tables, keys, data types, and more
-              </Typography>
+            <CardContent sx={{ 
+              p: 4, 
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <Box>
+                <School sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+                <Typography variant="h5" gutterBottom>
+                  Learn Concepts
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                  Master database fundamentals: tables, keys, data types, and more
+                </Typography>
+              </Box>
               <Button
                 variant="outlined"
                 onClick={() => navigate('/learn')}
                 fullWidth
+                sx={{ mt: 'auto' }}
               >
                 Explore Concepts
               </Button>
@@ -97,18 +106,27 @@ export default function HomePage() {
         
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
-            <CardContent sx={{ p: 4 }}>
-              <Code sx={{ fontSize: 60, color: 'secondary.main', mb: 2 }} />
-              <Typography variant="h5" gutterBottom>
-                Practice Skills
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Apply your knowledge with hands-on SQL exercises and real databases
-              </Typography>
+            <CardContent sx={{ 
+              p: 4, 
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <Box>
+                <Code sx={{ fontSize: 60, color: 'secondary.main', mb: 2 }} />
+                <Typography variant="h5" gutterBottom>
+                  Practice Skills
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                  Apply your knowledge with hands-on SQL exercises and real databases
+                </Typography>
+              </Box>
               <Button
                 variant="outlined"
                 onClick={() => navigate('/learn')}
                 fullWidth
+                sx={{ mt: 'auto' }}
               >
                 Start Practicing
               </Button>

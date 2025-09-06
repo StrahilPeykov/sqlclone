@@ -1,0 +1,19 @@
+{
+  "name": "Database Tables",
+  "description": "Learn about rows, columns, and how data is structured in tables",
+  "theory": "\nDatabase tables are the fundamental building blocks of relational databases. They organize data into rows and columns, similar to a spreadsheet.\n\n## Table Structure:\n- **Rows (Records/Tuples)**: Each row represents a single entity or record\n- **Columns (Fields/Attributes)**: Each column represents a specific property or characteristic\n- **Cells**: The intersection of a row and column contains a single data value\n\n## Table Properties:\n- **Table Name**: Unique identifier for the table\n- **Schema**: The structure definition of the table\n- **Primary Key**: Unique identifier for each row\n- **Data Types**: Define what kind of data each column can store\n",
+  "summary": "\nTables organize data in rows and columns. Rows represent individual records, columns represent attributes, and cells contain individual data values. Each table has a schema that defines its structure.\n",
+  "examples": [
+    {
+      "title": "Employee Table",
+      "content": "Columns: ID, Name, Department, Salary, Hire_Date"
+    },
+    {
+      "title": "Product Table",
+      "content": "Columns: Product_ID, Name, Price, Category, Stock_Quantity"
+    }
+  ],
+  "prerequisites": ["database"],
+  "nextConcepts": ["data-types", "database-keys"]
+}
+

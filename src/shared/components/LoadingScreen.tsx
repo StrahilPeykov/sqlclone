@@ -1,4 +1,3 @@
-// LoadingScreen.tsx
 import { Box, CircularProgress, Typography } from '@mui/material';
 
 interface LoadingScreenProps {

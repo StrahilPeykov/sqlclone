@@ -1,486 +1,197 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Container,
-  Typography,
   Box,
   Button,
   Card,
   CardContent,
-  Tabs,
-  Tab,
+  Container,
+  Typography,
   Alert,
-  Grid,
-  Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  LinearProgress,
+  Snackbar,
 } from '@mui/material';
-import {
-  ArrowBack,
-  Code as CodeIcon,
-  Lightbulb,
-  MenuBook,
-  Storage,
-  School,
-  ExpandMore,
-  CheckCircle,
-  PlayArrow,
-} from '@mui/icons-material';
-import { useAppStore } from '@/store';
+import { PlayArrow, CheckCircle, ArrowBack } from '@mui/icons-material';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
 import { useDatabase } from '@/features/database/DatabaseService';
 import { databaseConfigs } from '@/features/database/schemas';
-
-// Mock skill data with everything in one place
-const skillData: Record<string, any> = {
-  'filter-rows': {
-    name: 'Filter Rows',
-    description: 'Use WHERE clause to filter data based on conditions',
-    database: 'basic',
-    theory: `
-# Filtering Rows in SQL
-
-Filtering is one of the most fundamental operations in SQL. It allows you to select only the rows that meet specific criteria.
-
-## The WHERE Clause
-
-The \`WHERE\` clause is used to filter records based on specific conditions:
-
-\`\`\`sql
-SELECT * FROM companies
-WHERE country = 'Netherlands';
-\`\`\`
-
-## Comparison Operators
-
-- \`=\` Equal to
-- \`<>\` or \`!=\` Not equal to
-- \`<\` Less than
-- \`>\` Greater than
-- \`<=\` Less than or equal to
-- \`>=\` Greater than or equal to
-
-## Pattern Matching
-
-Use \`LIKE\` with wildcards:
-- \`%\` matches any sequence of characters
-- \`_\` matches a single character
-
-\`\`\`sql
-SELECT * FROM companies
-WHERE company_name LIKE 'Meta%';
-\`\`\`
-    `,
-    reference: {
-      syntax: "SELECT column1, column2, ...\nFROM table_name\nWHERE condition;",
-      examples: [
-        {
-          title: "Filter by exact value",
-          sql: "SELECT * FROM companies WHERE country = 'Netherlands';",
-          description: "Returns all companies from the Netherlands"
-        },
-        {
-          title: "Filter with comparison",
-          sql: "SELECT * FROM positions WHERE salary > 100000;",
-          description: "Returns all positions with salary greater than 100,000"
-        },
-        {
-          title: "Filter with pattern",
-          sql: "SELECT * FROM companies WHERE company_name LIKE 'M%';",
-          description: "Returns all companies whose name starts with 'M'"
-        }
-      ],
-      commonMistakes: [
-        {
-          mistake: "Using = with NULL values",
-          correction: "Use IS NULL or IS NOT NULL instead"
-        },
-        {
-          mistake: "Forgetting quotes around string values",
-          correction: "Always wrap string values in single quotes"
-        }
-      ]
-    },
-    exercises: [
-      {
-        id: 1,
-        title: "Filter by Country",
-        description: "Find all companies from the Netherlands",
-        expectedQuery: "SELECT * FROM companies WHERE country = 'Netherlands';",
-        hints: [
-          "Use the WHERE clause to filter rows",
-          "Remember to use quotes around string values",
-          "The country column contains 'Netherlands'"
-        ]
-      },
-      {
-        id: 2,
-        title: "Filter by Salary Range",
-        description: "Find all positions with salary greater than 100,000",
-        expectedQuery: "SELECT * FROM positions WHERE salary > 100000;",
-        hints: [
-          "Use the > operator for greater than",
-          "Numeric values don't need quotes",
-          "The column name is 'salary'"
-        ]
-      },
-      {
-        id: 3,
-        title: "Pattern Matching",
-        description: "Find all companies whose name starts with 'A'",
-        expectedQuery: "SELECT * FROM companies WHERE company_name LIKE 'A%';",
-        hints: [
-          "Use the LIKE operator for pattern matching",
-          "Use % as a wildcard for any characters",
-          "The pattern should be 'A%'"
-        ]
-      }
-    ]
-  },
-  'choose-columns': {
-    name: 'Choose Columns',
-    description: 'Select specific columns and rename them with aliases',
-    database: 'basic',
-    theory: `
-# Selecting Columns in SQL
-
-Instead of selecting all columns with \`*\`, you can choose specific columns to display in your results.
-
-## Basic Column Selection
-
-\`\`\`sql
-SELECT company_name, country 
-FROM companies;
-\`\`\`
-
-## Column Aliases
-
-You can rename columns in the output using aliases:
-
-\`\`\`sql
-SELECT 
-    company_name AS "Company Name",
-    country AS "Location"
-FROM companies;
-\`\`\`
-
-## Benefits of Column Selection
-
-- **Performance**: Only retrieve data you need
-- **Clarity**: Focus on relevant information
-- **Security**: Hide sensitive columns
-- **Bandwidth**: Reduce data transfer
-    `,
-    reference: {
-      syntax: "SELECT column1, column2 AS alias\nFROM table_name;",
-      examples: [
-        {
-          title: "Select specific columns",
-          sql: "SELECT company_name, country FROM companies;",
-          description: "Returns only the name and country columns"
-        },
-        {
-          title: "Using aliases",
-          sql: "SELECT company_name AS name, country AS location FROM companies;",
-          description: "Renames columns in the output"
-        }
-      ]
-    },
-    exercises: [
-      {
-        id: 1,
-        title: "Select Company Names",
-        description: "Select only the company names from the companies table",
-        expectedQuery: "SELECT company_name FROM companies;",
-        hints: ["List the specific column name after SELECT", "Don't use * for this exercise"]
-      }
-    ]
-  }
-};
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      {...other}
-    >
-      {value === index && <Box>{children}</Box>}
-    </div>
-  );
-}
+import { useAppStore } from '@/store';
+import { loadSkillsLibrary } from '@/features/content/contentIndex';
 
 export default function SkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState(0);
-  const [query, setQuery] = useState('');
-  const [currentExercise, setCurrentExercise] = useState(0);
-  const updateProgress = useAppStore((state) => state.updateProgress);
-  const user = useAppStore((state) => state.user);
+  const updateProgress = useAppStore((s) => s.updateProgress);
+  const user = useAppStore((s) => s.user);
 
-  const skill = skillData[skillId!];
-  
-  const {
-    executeQuery,
-    queryResult,
-    queryError,
-    isExecuting,
-    tableNames,
-  } = useDatabase(skill ? databaseConfigs[skill.database as keyof typeof databaseConfigs] : databaseConfigs.basic);
+  // Load a simple skill exercise from content library (first filtering exercise)
+  const [exerciseState, setExerciseState] = useState<any | null>(null);
+  const [exerciseDef, setExerciseDef] = useState<any | null>(null);
+  const [query, setQuery] = useState('');
+
+  // Decide database config based on exercise config
+  const dbConfig = useMemo(() => {
+    const target = exerciseDef?.config?.database as string | undefined;
+    if (target === 'companies') return databaseConfigs.basic;
+    if (target === 'positions') return databaseConfigs.intermediate;
+    return databaseConfigs.basic;
+  }, [exerciseDef]);
+
+  const { executeQuery, queryResult, queryError, isExecuting } = useDatabase(dbConfig);
+
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info';
+  }>({ open: false, message: '', severity: 'info' });
+
+  const isCompleted = user?.progress[skillId || '']?.completed || false;
 
   useEffect(() => {
+    // Touch progress for lastAccessed tracking
     if (skillId) {
-      updateProgress(skillId, { 
-        lastAccessed: new Date(),
-        type: 'skill'
-      });
+      updateProgress(skillId, { type: 'skill' });
     }
   }, [skillId, updateProgress]);
 
-  if (!skill) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">
-          Skill not found. <Button onClick={() => navigate('/learn')}>Return to learning</Button>
-        </Alert>
-      </Container>
-    );
-  }
+  // Generate the exercise from content on mount/change
+  useEffect(() => {
+    // Only handle known skill for now
+    if (!skillId) return;
+    loadSkillsLibrary().then((lib) => {
+      const exercises = lib?.exercises || [];
+      const first = exercises[0];
+      if (!first) return;
 
-  const progress = user?.progress[skillId!];
-  const exercisesCompleted = progress?.exercisesCompleted || 0;
-  const totalExercises = skill.exercises?.length || 0;
+      // Build utils the content generator expects
+      const utils = {
+        selectRandomly: <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)],
+        generateRandomNumber: (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min,
+      };
 
-  const handleExecuteQuery = async () => {
+      try {
+        // Compile generator function
+        const genFn = (new Function('utils', `${first.generator}; return generate;`))(utils);
+        const state = genFn(utils);
+        setExerciseState(state);
+        setExerciseDef(first);
+
+        // Seed the editor with the solution template if present
+        if (first.solutionTemplate) {
+          // Replace handlebars-like placeholders {{var}}
+          const seeded = first.solutionTemplate.replace(/{{\s*(\w+)\s*}}/g, (_m: string, key: string) => String(state?.[key] ?? ''));
+          setQuery(seeded);
+        }
+      } catch (err) {
+        console.error('Failed to initialize exercise:', err);
+      }
+    });
+  }, [skillId]);
+
+  const handleExecute = async () => {
     try {
-      await executeQuery(query);
-    } catch (error) {
-      console.error('Query execution failed:', error);
+      const res = await executeQuery(query);
+
+      // Validate via content validator if available
+      let ok = false;
+      if (exerciseDef?.validator) {
+        try {
+          const validateFn = (new Function('input', 'state', 'result', `${exerciseDef.validator}; return validate(input, state, result);`));
+          ok = !!validateFn(query, exerciseState, res);
+        } catch (e) {
+          console.error('Validator error:', e);
+          ok = false;
+        }
+      } else {
+        // Fallback: any result rows means success
+        ok = Array.isArray(res) && res.length > 0 && res[0].values.length > 0;
+      }
+
+      if (ok && skillId && !isCompleted) {
+        updateProgress(skillId, { type: 'skill', completed: true });
+        setSnackbar({ open: true, message: 'Great job! Skill completed.', severity: 'success' });
+      } else {
+        setSnackbar({
+          open: true,
+          message: ok ? 'Query ran successfully.' : 'Query ran, but did not meet the goal.',
+          severity: ok ? 'success' : 'info',
+        });
+      }
+    } catch (e: any) {
+      setSnackbar({
+        open: true,
+        message: e?.message || 'Query failed',
+        severity: 'error',
+      });
     }
   };
 
-  const formatContent = (content: string) => {
-    const lines = content.trim().split('\n');
-    return lines.map((line, index) => {
-      if (line.startsWith('# ')) {
-        return <Typography key={index} variant="h5" sx={{ mt: 2, mb: 2, fontWeight: 'bold' }}>{line.replace('# ', '')}</Typography>;
-      } else if (line.startsWith('## ')) {
-        return <Typography key={index} variant="h6" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>{line.replace('## ', '')}</Typography>;
-      } else if (line.startsWith('```sql')) {
-        return null; // Handle code blocks separately
-      } else if (line.startsWith('```')) {
-        return null;
-      } else if (line.startsWith('- ')) {
-        return <Typography key={index} variant="body1" sx={{ ml: 2, mb: 0.5 }}>{line}</Typography>;
-      } else if (line.trim() === '') {
-        return <br key={index} />;
-      } else {
-        return <Typography key={index} variant="body1" paragraph>{line}</Typography>;
-      }
-    });
-  };
-
   return (
-    <Container maxWidth="xl" sx={{ py: 2 }}>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Button 
-          startIcon={<ArrowBack />} 
-          onClick={() => navigate('/learn')}
-          sx={{ mr: 2 }}
-        >
-          Back
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Button startIcon={<ArrowBack />} sx={{ mr: 2 }} onClick={() => navigate('/learn')}>
+          Back to Learning
         </Button>
-        <CodeIcon color="secondary" sx={{ mr: 1 }} />
-        <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>
-          {skill.name}
+        <Typography variant="h4" sx={{ flexGrow: 1 }}>
+          {skillId || 'Skill'}
+          {isCompleted && <CheckCircle color="success" sx={{ ml: 1 }} />}
         </Typography>
       </Box>
 
       {/* Description */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="body1" color="text.secondary">
-          {skill.description}
-        </Typography>
-      </Box>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        {exerciseState?.description || 'Solve the task by writing a SQL query.'}
+      </Alert>
 
-      {/* Progress */}
-      {totalExercises > 0 && exercisesCompleted > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="body2" color="text.secondary">
-            Progress: {exercisesCompleted} of {totalExercises} exercises completed
+      {/* Editor Card */}
+      <Card sx={{ mb: 2 }}>
+        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between' }}>
+          <Typography variant="subtitle2" sx={{ alignSelf: 'center', ml: 1 }}>
+            Write your SQL below
           </Typography>
+          <Button
+            startIcon={<PlayArrow />}
+            onClick={handleExecute}
+            disabled={!query.trim() || isExecuting}
+            variant="contained"
+            sx={{ mr: 1 }}
+          >
+            Run
+          </Button>
         </Box>
-      )}
+        <CardContent sx={{ p: 0 }}>
+          <SQLEditor value={query} onChange={setQuery} height="260px" onExecute={handleExecute} />
+        </CardContent>
+      </Card>
 
-      <Grid container spacing={3}>
-        {/* Left Column - Content */}
-        <Grid item xs={12} lg={6}>
-          <Card>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs value={currentTab} onChange={(_, newValue) => setCurrentTab(newValue)} variant="fullWidth">
-                <Tab label="Practice" icon={<PlayArrow />} iconPosition="start" />
-                <Tab label="Theory" icon={<Lightbulb />} iconPosition="start" />
-                <Tab label="Reference" icon={<MenuBook />} iconPosition="start" />
-                <Tab label="Schema" icon={<Storage />} iconPosition="start" />
-              </Tabs>
-            </Box>
+      {/* Results */}
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Results
+          </Typography>
+          {queryError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {queryError instanceof Error ? queryError.message : 'Query execution failed'}
+            </Alert>
+          )}
+          {queryResult && queryResult.length > 0 ? (
+            <DataTable data={queryResult[0]} />
+          ) : (
+            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+              Run your query to see results
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
 
-            <TabPanel value={currentTab} index={0}>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>Exercises</Typography>
-                
-                {skill.exercises?.map((exercise: any, index: number) => (
-                  <Accordion key={exercise.id} expanded={currentExercise === index}>
-                    <AccordionSummary 
-                      expandIcon={<ExpandMore />}
-                      onClick={() => setCurrentExercise(index)}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {exercisesCompleted > index ? (
-                          <CheckCircle color="success" />
-                        ) : (
-                          <School color="action" />
-                        )}
-                        <Typography variant="h6">{exercise.title}</Typography>
-                      </Box>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Typography variant="body1" paragraph>
-                        {exercise.description}
-                      </Typography>
-                      
-                      {exercise.hints && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="subtitle2" gutterBottom>Hints:</Typography>
-                          {exercise.hints.map((hint: string, hintIndex: number) => (
-                            <Typography key={hintIndex} variant="body2" sx={{ ml: 2, mb: 0.5 }}>
-                              • {hint}
-                            </Typography>
-                          ))}
-                        </Box>
-                      )}
-                      
-                      <Button 
-                        variant="contained" 
-                        size="small"
-                        onClick={() => setQuery(exercise.expectedQuery)}
-                      >
-                        Show Solution
-                      </Button>
-                    </AccordionDetails>
-                  </Accordion>
-                ))}
-              </CardContent>
-            </TabPanel>
-
-            <TabPanel value={currentTab} index={1}>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>Theory</Typography>
-                {formatContent(skill.theory)}
-              </CardContent>
-            </TabPanel>
-
-            <TabPanel value={currentTab} index={2}>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>SQL Reference</Typography>
-                
-                {skill.reference && (
-                  <>
-                    <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Syntax</Typography>
-                    <Paper sx={{ p: 2, bgcolor: 'grey.100', fontFamily: 'monospace', mb: 2 }}>
-                      <pre>{skill.reference.syntax}</pre>
-                    </Paper>
-                    
-                    {skill.reference.examples && (
-                      <>
-                        <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Examples</Typography>
-                        {skill.reference.examples.map((example: any, index: number) => (
-                          <Box key={index} sx={{ mb: 2 }}>
-                            <Typography variant="subtitle2">{example.title}</Typography>
-                            <Paper sx={{ p: 2, bgcolor: 'grey.50', fontFamily: 'monospace', fontSize: '0.875rem', mb: 1 }}>
-                              <code>{example.sql}</code>
-                            </Paper>
-                            <Typography variant="body2" color="text.secondary">
-                              {example.description}
-                            </Typography>
-                          </Box>
-                        ))}
-                      </>
-                    )}
-                    
-                    {skill.reference.commonMistakes && (
-                      <>
-                        <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Common Mistakes</Typography>
-                        {skill.reference.commonMistakes.map((mistake: any, index: number) => (
-                          <Alert key={index} severity="warning" sx={{ mb: 1 }}>
-                            <Typography variant="body2">
-                              <strong>Mistake:</strong> {mistake.mistake}<br />
-                              <strong>Correction:</strong> {mistake.correction}
-                            </Typography>
-                          </Alert>
-                        ))}
-                      </>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </TabPanel>
-
-            <TabPanel value={currentTab} index={3}>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>Database Schema</Typography>
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  Available tables: {tableNames.join(', ')}
-                </Alert>
-                <Typography variant="body1">
-                  This skill uses the <strong>{skill.database}</strong> database configuration.
-                </Typography>
-              </CardContent>
-            </TabPanel>
-          </Card>
-        </Grid>
-
-        {/* Right Column - SQL Editor & Results */}
-        <Grid item xs={12} lg={6}>
-          <Card sx={{ height: 'fit-content' }}>
-            <CardContent>
-              <Typography variant="h5" gutterBottom>SQL Practice</Typography>
-              <SQLEditor
-                value={query}
-                onChange={setQuery}
-                onExecute={handleExecuteQuery}
-                height="300px"
-                placeholder="Write your SQL query here..."
-              />
-              
-              {queryError && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                  {queryError instanceof Error ? queryError.message : 'Query execution failed'}
-                </Alert>
-              )}
-              
-              {queryResult && queryResult.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="h6" gutterBottom>Results</Typography>
-                  <DataTable data={queryResult[0]} maxHeight={400} />
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2500}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        message={snackbar.message}
+      />
     </Container>
   );
 }

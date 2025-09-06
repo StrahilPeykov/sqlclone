@@ -8,81 +8,50 @@ import {
   Button,
   Grid,
 } from '@mui/material';
-import {
-  CheckCircle,
-  PlayArrow,
-  Lock,
-} from '@mui/icons-material';
+import { CheckCircle, PlayArrow } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store';
-
-// Simplified data - just the essentials
-const concepts = [
-  {
-    id: 'database',
-    name: 'What is a Database?',
-    prerequisites: [],
-  },
-  {
-    id: 'database-table', 
-    name: 'Database Tables',
-    prerequisites: ['database'],
-  },
-  {
-    id: 'data-types',
-    name: 'Data Types',
-    prerequisites: ['database-table'],
-  },
-  {
-    id: 'database-keys',
-    name: 'Database Keys', 
-    prerequisites: ['database-table'],
-  },
-];
-
-const skills = [
-  {
-    id: 'filter-rows',
-    name: 'Filter Rows',
-    prerequisites: ['data-types'],
-  },
-  {
-    id: 'filter-rows-multiple',
-    name: 'Filter Multiple Criteria',
-    prerequisites: ['filter-rows'],
-  },
-  {
-    id: 'choose-columns',
-    name: 'Choose Columns', 
-    prerequisites: [],
-  },
-  {
-    id: 'sort-rows',
-    name: 'Sort Rows',
-    prerequisites: ['data-types'],
-  },
-  {
-    id: 'join-tables',
-    name: 'Join Tables',
-    prerequisites: ['database-keys', 'choose-columns'],
-  },
-];
+import { ContentEntryMeta, loadContentIndex } from '@/features/content/contentIndex';
+import { useEffect, useMemo, useState } from 'react';
 
 export default function LearningOverviewPage() {
   const navigate = useNavigate();
   const user = useAppStore((state) => state.user);
 
+  const [index, setIndex] = useState<ContentEntryMeta[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    loadContentIndex()
+      .then((data) => {
+        if (mounted) setIndex(data);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const concepts: Pick<ContentEntryMeta, 'id' | 'name' | 'prerequisites'>[] = useMemo(() => (
+    (index || [])
+      .filter((e) => e.type === 'concept')
+      .map((e) => ({ id: e.id, name: e.name, prerequisites: e.prerequisites || [] }))
+  ), [index]);
+
+  const skills: Pick<ContentEntryMeta, 'id' | 'name' | 'prerequisites'>[] = useMemo(() => (
+    (index || [])
+      .filter((e) => e.type === 'skill')
+      .map((e) => ({ id: e.id, name: e.name, prerequisites: e.prerequisites || [] }))
+  ), [index]);
+
   const isCompleted = (id: string) => {
     return user?.progress[id]?.completed || false;
   };
 
-  const canAccess = (prerequisites: string[]) => {
-    return prerequisites.every(prereq => isCompleted(prereq));
-  };
-
   const renderItem = (item: any, type: 'concept' | 'skill') => {
     const completed = isCompleted(item.id);
-    const accessible = canAccess(item.prerequisites);
+    const accessible = true; // Always unlocked
     
     return (
       <Grid item xs={12} sm={6} md={4} key={item.id}>
@@ -92,19 +61,17 @@ export default function LearningOverviewPage() {
             display: 'flex',
             flexDirection: 'column',
             transition: 'transform 0.2s, box-shadow 0.2s',
-            '&:hover': accessible ? {
+            '&:hover': {
               transform: 'translateY(-2px)',
               boxShadow: 2,
-            } : {},
-            opacity: accessible ? 1 : 0.5,
+            },
+            opacity: 1,
           }}
         >
           <CardContent sx={{ pb: 1, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, flexGrow: 1 }}>
               <Box sx={{ mt: 0.5 }}>
-                {!accessible ? (
-                  <Lock color="disabled" fontSize="small" />
-                ) : completed ? (
+                {completed ? (
                   <CheckCircle color="success" fontSize="small" />
                 ) : (
                   <PlayArrow color="action" fontSize="small" />
@@ -129,7 +96,7 @@ export default function LearningOverviewPage() {
                     color="text.secondary"
                     sx={{ display: 'block' }}
                   >
-                    Needs: {item.prerequisites.join(', ')}
+                    Prerequisites: {item.prerequisites.join(', ')}
                   </Typography>
                 )}
               </Box>
@@ -141,7 +108,6 @@ export default function LearningOverviewPage() {
               size="small"
               variant={completed ? "outlined" : "contained"}
               onClick={() => navigate(`/${type}/${item.id}`)}
-              disabled={!accessible}
               fullWidth
               sx={{ 
                 textTransform: 'none',
@@ -158,6 +124,11 @@ export default function LearningOverviewPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+      )}
       {/* Simple Header */}
       <Box sx={{ mb: 6, textAlign: 'center' }}>
         <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 600 }}>

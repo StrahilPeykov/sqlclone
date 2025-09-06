@@ -20,78 +20,8 @@ import {
   MenuBook,
 } from '@mui/icons-material';
 import { useAppStore } from '@/store';
-import { LoadingScreen } from '@/shared/components/LoadingScreen';
-
-// Mock concept data - this would come from your content JSON
-const conceptData: Record<string, any> = {
-  'database': {
-    name: 'What is a Database?',
-    description: 'Understanding databases, tables, and database management systems',
-    theory: `
-A database is a structured collection of data that is stored and organized in a way that allows for efficient retrieval and manipulation. Think of it as a digital filing cabinet where information is stored in an organized manner.
-
-## Key Components:
-- **Tables**: Store data in rows and columns
-- **Records**: Individual entries (rows) in a table
-- **Fields**: Individual data points (columns) in a record
-- **Database Management System (DBMS)**: Software that manages the database
-
-## Why Use Databases?
-- **Organization**: Data is structured and easy to find
-- **Efficiency**: Fast retrieval of specific information
-- **Reliability**: Data integrity and backup capabilities
-- **Scalability**: Can handle large amounts of data
-- **Security**: Access control and permissions
-    `,
-    summary: `
-Databases are essential for storing and managing data efficiently. They consist of tables with rows (records) and columns (fields), managed by a DBMS. Key benefits include organization, efficiency, reliability, scalability, and security.
-    `,
-    examples: [
-      {
-        title: 'Company Database',
-        content: 'A company might have tables for employees, departments, and projects, all linked together.'
-      },
-      {
-        title: 'E-commerce Database',
-        content: 'An online store would have tables for products, customers, orders, and inventory.'
-      }
-    ],
-    nextConcepts: ['database-table']
-  },
-  'database-table': {
-    name: 'Database Tables',
-    description: 'Learn about rows, columns, and how data is structured in tables',
-    theory: `
-Database tables are the fundamental building blocks of relational databases. They organize data into rows and columns, similar to a spreadsheet.
-
-## Table Structure:
-- **Rows (Records/Tuples)**: Each row represents a single entity or record
-- **Columns (Fields/Attributes)**: Each column represents a specific property or characteristic
-- **Cells**: The intersection of a row and column contains a single data value
-
-## Table Properties:
-- **Table Name**: Unique identifier for the table
-- **Schema**: The structure definition of the table
-- **Primary Key**: Unique identifier for each row
-- **Data Types**: Define what kind of data each column can store
-    `,
-    summary: `
-Tables organize data in rows and columns. Rows represent individual records, columns represent attributes, and cells contain individual data values. Each table has a schema that defines its structure.
-    `,
-    examples: [
-      {
-        title: 'Employee Table',
-        content: 'Columns: ID, Name, Department, Salary, Hire_Date'
-      },
-      {
-        title: 'Product Table', 
-        content: 'Columns: Product_ID, Name, Price, Category, Stock_Quantity'
-      }
-    ],
-    prerequisites: ['database'],
-    nextConcepts: ['data-types', 'database-keys']
-  }
-};
+//
+import { getConceptDetails, loadContentIndex, ContentEntryMeta } from '@/features/content/contentIndex';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -122,7 +52,29 @@ export default function ConceptPage() {
   const updateProgress = useAppStore((state) => state.updateProgress);
   const user = useAppStore((state) => state.user);
 
-  const concept = conceptData[conceptId!];
+  const [conceptMeta, setConceptMeta] = useState<ContentEntryMeta | null>(null);
+  const [conceptDetails, setConceptDetails] = useState<any | null>(null);
+  const [metaLoading, setMetaLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let mounted = true;
+    if (conceptId) {
+      // Load meta from content index
+      loadContentIndex().then((idx) => {
+        if (!mounted) return;
+        const found = idx.find((e) => e.type === 'concept' && e.id === conceptId) || null;
+        setConceptMeta(found);
+      }).catch(() => {/* ignore */})
+      .finally(() => { if (mounted) setMetaLoading(false); });
+
+      getConceptDetails(conceptId).then((d) => {
+        if (mounted) setConceptDetails(d);
+      });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [conceptId]);
 
   useEffect(() => {
     if (conceptId) {
@@ -133,7 +85,15 @@ export default function ConceptPage() {
     }
   }, [conceptId, updateProgress]);
 
-  if (!concept) {
+  if (metaLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography>Loading...</Typography>
+      </Container>
+    );
+  }
+
+  if (!conceptMeta) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error">
@@ -186,7 +146,7 @@ export default function ConceptPage() {
         </Button>
         <School color="primary" sx={{ mr: 1 }} />
         <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>
-          {concept.name}
+          {conceptMeta.name}
           {isCompleted && <CheckCircle color="success" sx={{ ml: 1 }} />}
         </Typography>
       </Box>
@@ -194,14 +154,14 @@ export default function ConceptPage() {
       {/* Concept Info */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="body1" color="text.secondary">
-          {concept.description}
+          {conceptMeta.description}
         </Typography>
       </Box>
 
       {/* Prerequisites */}
-      {concept.prerequisites && (
+      {conceptMeta.prerequisites && conceptMeta.prerequisites.length > 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          <strong>Prerequisites:</strong> {concept.prerequisites.join(', ')}
+          <strong>Prerequisites:</strong> {conceptMeta.prerequisites.join(', ')}
         </Alert>
       )}
 
@@ -217,19 +177,23 @@ export default function ConceptPage() {
         <TabPanel value={currentTab} index={0}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Theory</Typography>
-            {formatContent(concept.theory)}
+            {conceptDetails?.theory ? formatContent(conceptDetails.theory) : (
+              <Typography variant="body1" color="text.secondary">Theory coming soon.</Typography>
+            )}
           </CardContent>
         </TabPanel>
 
         <TabPanel value={currentTab} index={1}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Summary</Typography>
-            {formatContent(concept.summary)}
+            {conceptDetails?.summary ? formatContent(conceptDetails.summary) : (
+              <Typography variant="body1" color="text.secondary">Summary coming soon.</Typography>
+            )}
             
-            {concept.examples && concept.examples.length > 0 && (
+            {conceptDetails?.examples && conceptDetails.examples.length > 0 && (
               <>
                 <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>Examples</Typography>
-                {concept.examples.map((example: any, index: number) => (
+                {conceptDetails.examples.map((example: any, index: number) => (
                   <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                     <Typography variant="subtitle2" gutterBottom>{example.title}</Typography>
                     <Typography variant="body2">{example.content}</Typography>
@@ -256,13 +220,13 @@ export default function ConceptPage() {
             </Button>
           )}
           
-          {concept.nextConcepts && concept.nextConcepts.length > 0 && (
+          {conceptDetails?.nextConcepts && conceptDetails.nextConcepts.length > 0 && (
             <Button
               variant="outlined"
               endIcon={<ArrowForward />}
-              onClick={() => navigate(`/concept/${concept.nextConcepts[0]}`)}
+              onClick={() => navigate(`/concept/${conceptDetails.nextConcepts[0]}`)}
             >
-              Next: {conceptData[concept.nextConcepts[0]]?.name}
+              Next
             </Button>
           )}
         </Box>
