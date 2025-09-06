@@ -1,4 +1,5 @@
 // Database schema definitions for exercises and playground
+import { DatabaseConfig } from './DatabaseService';
 
 export const schemas = {
   companies: `
@@ -199,13 +200,13 @@ export function getCombinedSchema(...schemaNames: (keyof typeof schemas)[]): str
 }
 
 // Pre-defined database configurations for different exercise types
-export const databaseConfigs = {
+export const databaseConfigs: Record<string, DatabaseConfig> = {
   basic: {
     name: 'basic',
     schema: schemas.companies,
   },
   intermediate: {
-    name: 'intermediate',
+    name: 'intermediate', 
     schema: getCombinedSchema('companies', 'positions'),
   },
   advanced: {
@@ -217,3 +218,18 @@ export const databaseConfigs = {
     schema: getCombinedSchema('companies', 'positions', 'employees', 'sales'),
   },
 };
+
+// Skill-specific database configurations
+export const skillDatabaseConfigs: Record<string, DatabaseConfig> = {
+  'filter-rows': databaseConfigs.basic,
+  'choose-columns': databaseConfigs.basic,
+  'sort-rows': databaseConfigs.basic,
+  'join-tables': databaseConfigs.intermediate,
+  'aggregate-columns': databaseConfigs.intermediate,
+  'multi-table-query': databaseConfigs.advanced,
+};
+
+// Helper function to get database config for a skill
+export function getDatabaseConfigForSkill(skillId: string): DatabaseConfig {
+  return skillDatabaseConfigs[skillId] || databaseConfigs.basic;
+}

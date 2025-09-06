@@ -10,6 +10,7 @@ import {
   Tabs,
   Tab,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -19,9 +20,9 @@ import {
   Lightbulb,
   MenuBook,
 } from '@mui/icons-material';
+
 import { useAppStore } from '@/store';
-//
-import { getConceptDetails, loadContentIndex, ContentEntryMeta } from '@/features/content/contentIndex';
+import { useComponentMeta, useConceptContent } from '@/features/content/ContentService';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -52,29 +53,9 @@ export default function ConceptPage() {
   const updateProgress = useAppStore((state) => state.updateProgress);
   const user = useAppStore((state) => state.user);
 
-  const [conceptMeta, setConceptMeta] = useState<ContentEntryMeta | null>(null);
-  const [conceptDetails, setConceptDetails] = useState<any | null>(null);
-  const [metaLoading, setMetaLoading] = useState<boolean>(true);
-
-  useEffect(() => {
-    let mounted = true;
-    if (conceptId) {
-      // Load meta from content index
-      loadContentIndex().then((idx) => {
-        if (!mounted) return;
-        const found = idx.find((e) => e.type === 'concept' && e.id === conceptId) || null;
-        setConceptMeta(found);
-      }).catch(() => {/* ignore */})
-      .finally(() => { if (mounted) setMetaLoading(false); });
-
-      getConceptDetails(conceptId).then((d) => {
-        if (mounted) setConceptDetails(d);
-      });
-    }
-    return () => {
-      mounted = false;
-    };
-  }, [conceptId]);
+  // Load content using the new service
+  const { data: conceptMeta, isLoading: metaLoading, error: metaError } = useComponentMeta(conceptId || '');
+  const { data: conceptContent, isLoading: contentLoading, error: contentError } = useConceptContent(conceptId || '');
 
   useEffect(() => {
     if (conceptId) {
@@ -87,13 +68,13 @@ export default function ConceptPage() {
 
   if (metaLoading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Typography>Loading...</Typography>
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
       </Container>
     );
   }
 
-  if (!conceptMeta) {
+  if (metaError || !conceptMeta) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error">
@@ -156,6 +137,11 @@ export default function ConceptPage() {
         <Typography variant="body1" color="text.secondary">
           {conceptMeta.description}
         </Typography>
+        {conceptMeta.estimatedTime && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Estimated time: {conceptMeta.estimatedTime} minutes
+          </Typography>
+        )}
       </Box>
 
       {/* Prerequisites */}
@@ -177,7 +163,15 @@ export default function ConceptPage() {
         <TabPanel value={currentTab} index={0}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Theory</Typography>
-            {conceptDetails?.theory ? formatContent(conceptDetails.theory) : (
+            {contentLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : contentError ? (
+              <Alert severity="error">Failed to load theory content</Alert>
+            ) : conceptContent?.theory ? (
+              formatContent(conceptContent.theory)
+            ) : (
               <Typography variant="body1" color="text.secondary">Theory coming soon.</Typography>
             )}
           </CardContent>
@@ -186,14 +180,22 @@ export default function ConceptPage() {
         <TabPanel value={currentTab} index={1}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Summary</Typography>
-            {conceptDetails?.summary ? formatContent(conceptDetails.summary) : (
+            {contentLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : contentError ? (
+              <Alert severity="error">Failed to load summary content</Alert>
+            ) : conceptContent?.summary ? (
+              formatContent(conceptContent.summary)
+            ) : (
               <Typography variant="body1" color="text.secondary">Summary coming soon.</Typography>
             )}
             
-            {conceptDetails?.examples && conceptDetails.examples.length > 0 && (
+            {conceptContent?.examples && conceptContent.examples.length > 0 && (
               <>
                 <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>Examples</Typography>
-                {conceptDetails.examples.map((example: any, index: number) => (
+                {conceptContent.examples.map((example: any, index: number) => (
                   <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                     <Typography variant="subtitle2" gutterBottom>{example.title}</Typography>
                     <Typography variant="body2">{example.content}</Typography>
@@ -220,15 +222,18 @@ export default function ConceptPage() {
             </Button>
           )}
           
-          {conceptDetails?.nextConcepts && conceptDetails.nextConcepts.length > 0 && (
-            <Button
-              variant="outlined"
-              endIcon={<ArrowForward />}
-              onClick={() => navigate(`/concept/${conceptDetails.nextConcepts[0]}`)}
-            >
-              Next
-            </Button>
-          )}
+          {(() => {
+            const nextId = conceptContent?.nextConcepts?.[0];
+            return nextId ? (
+              <Button
+                variant="outlined"
+                endIcon={<ArrowForward />}
+                onClick={() => navigate(`/concept/${nextId}`)}
+              >
+                Next
+              </Button>
+            ) : null;
+          })()}
         </Box>
       </Box>
     </Container>

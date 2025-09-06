@@ -1,17 +1,20 @@
+import { StrictMode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { router } from './router';
-import { ColorModeContext, getTheme } from './theme';
 import { RouterProvider } from 'react-router-dom';
 import { Suspense, useEffect, useMemo } from 'react';
+import type { PaletteMode } from '@mui/material';
+
+import { router } from './router';
+import { ColorModeContext, getTheme } from './theme';
 import { LoadingScreen } from './shared/components/LoadingScreen';
 import { ErrorBoundary } from './shared/components/ErrorBoundary';
-import type { PaletteMode } from '@mui/material';
-import { useLocalStorage } from '@/shared/hooks';
+import { useLocalStorage } from './shared/hooks';
+import { DatabaseService } from './features/database/DatabaseService';
 
-// Create a query client
+// Initialize services
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -21,17 +24,22 @@ const queryClient = new QueryClient({
   },
 });
 
+// Initialize database service on app start
+DatabaseService.getInstance().initialize().catch(console.error);
+
 export function App() {
   const systemDefault: PaletteMode =
-    typeof window !== 'undefined' && window.matchMedia &&
+    typeof window !== 'undefined' && 
+    window.matchMedia &&
     window.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'dark'
       : 'light';
+      
   const [mode, setMode] = useLocalStorage<PaletteMode>('color-mode', systemDefault);
 
   const theme = useMemo(() => getTheme(mode), [mode]);
 
-  // Sync a data-theme attribute for CSS variables in index.css
+  // Sync theme attribute for CSS variables
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', mode);
   }, [mode]);
@@ -45,18 +53,20 @@ export function App() {
   );
 
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ColorModeContext.Provider value={colorMode}>
-          <ThemeProvider theme={theme}>
-            <CssBaseline />
-            <Suspense fallback={<LoadingScreen fullScreen />}>
-              <RouterProvider router={router} />
-            </Suspense>
-            {import.meta.env.DEV && <ReactQueryDevtools />}
-          </ThemeProvider>
-        </ColorModeContext.Provider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <StrictMode>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <ColorModeContext.Provider value={colorMode}>
+            <ThemeProvider theme={theme}>
+              <CssBaseline />
+              <Suspense fallback={<LoadingScreen fullScreen />}>
+                <RouterProvider router={router} />
+              </Suspense>
+              {import.meta.env.DEV && <ReactQueryDevtools />}
+            </ThemeProvider>
+          </ColorModeContext.Provider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </StrictMode>
   );
 }

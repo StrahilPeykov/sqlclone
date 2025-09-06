@@ -11,10 +11,11 @@ export interface DatabaseConfig {
   data?: string;
 }
 
-class DatabaseService {
+export class DatabaseService {
   private static instance: DatabaseService;
   private SQL?: any;
   private databases: Map<string, Database> = new Map();
+  private initPromise?: Promise<void>;
   
   private constructor() {}
   
@@ -31,185 +32,110 @@ class DatabaseService {
   async initialize(): Promise<void> {
     if (this.SQL) return;
     
-    this.SQL = await initSqlJs({
-      locateFile: (file) => `/sqljs/${file}`,
-    });
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+    
+    this.initPromise = this._doInitialize();
+    return this.initPromise;
+  }
+  
+  private async _doInitialize(): Promise<void> {
+    try {
+      this.SQL = await initSqlJs({
+        locateFile: (file) => `/sqljs/${file}`,
+      });
+      console.log('SQL.js initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize SQL.js:', error);
+      throw error;
+    }
   }
   
   /**
-   * Create or get a database instance
+   * Check if SQL.js is ready
+   */
+  isReady(): boolean {
+    return !!this.SQL;
+  }
+
+  /**
+   * Get or create a database instance for the given config
    */
   async getDatabase(config: DatabaseConfig): Promise<Database> {
-    await this.initialize();
-    
-    // Return existing database if already created
-    if (this.databases.has(config.name)) {
-      return this.databases.get(config.name)!;
+    if (!this.SQL) {
+      await this.initialize();
     }
-    
-    // Create new database
+
+    const existing = this.databases.get(config.name);
+    if (existing) {
+      return existing;
+    }
+
     const db = new this.SQL.Database();
-    
     // Apply schema if provided
-    if (config.schema) {
-      db.run(config.schema);
+    if (config.schema && config.schema.trim().length > 0) {
+      try {
+        db.exec(config.schema);
+      } catch (err) {
+        console.error('Failed to apply schema:', err);
+        throw err;
+      }
     }
-    
-    // Apply data if provided
-    if (config.data) {
-      db.run(config.data);
-    }
-    
     this.databases.set(config.name, db);
     return db;
   }
-  
+
   /**
-   * Execute a query on a specific database
+   * Execute a query against a named database
    */
-  async executeQuery(
-    databaseName: string,
-    query: string
-  ): Promise<QueryResult[]> {
+  async executeQuery(databaseName: string, query: string): Promise<QueryResult[]> {
     const db = this.databases.get(databaseName);
     if (!db) {
-      throw new Error(`Database "${databaseName}" not found`);
+      throw new Error(`Database '${databaseName}' not found`);
     }
-    
     try {
-      const results = db.exec(query);
-      return results.map(result => ({
-        columns: result.columns,
-        values: result.values,
-      }));
-    } catch (error) {
-      throw new Error(
-        `Query execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const results: QueryExecResult[] = db.exec(query);
+      return results.map((r) => ({ columns: r.columns, values: r.values }));
+    } catch (err) {
+      console.error('Query execution error:', err);
+      throw err instanceof Error ? err : new Error('Query execution failed');
     }
   }
-  
+
   /**
-   * Reset a database to its initial state
+   * Reset a database by name/config (close and recreate)
    */
   async resetDatabase(config: DatabaseConfig): Promise<void> {
-    const existingDb = this.databases.get(config.name);
-    if (existingDb) {
-      existingDb.close();
+    const existing = this.databases.get(config.name);
+    if (existing) {
+      try {
+        existing.close();
+      } catch {
+        // ignore close errors
+      }
       this.databases.delete(config.name);
     }
-    
     await this.getDatabase(config);
   }
-  
+
   /**
-   * Get all table names in a database
+   * Get list of user tables in a database
    */
   async getTableNames(databaseName: string): Promise<string[]> {
-    const results = await this.executeQuery(
-      databaseName,
-      'SELECT name FROM sqlite_master WHERE type="table"'
-    );
-    
-    if (!results.length || !results[0].values.length) {
+    const db = this.databases.get(databaseName);
+    if (!db) return [];
+    try {
+      const res = db.exec(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+      );
+      if (!res || res.length === 0) return [];
+      const first = res[0];
+      const idx = first.columns.findIndex((c) => c.toLowerCase() === 'name');
+      return first.values.map((row) => String(row[idx]));
+    } catch (err) {
+      console.error('Failed to get table names:', err);
       return [];
     }
-    
-    return results[0].values.map(row => row[0] as string);
   }
-  
-  /**
-   * Get table schema
-   */
-  async getTableSchema(
-    databaseName: string,
-    tableName: string
-  ): Promise<any[]> {
-    const results = await this.executeQuery(
-      databaseName,
-      `PRAGMA table_info(${tableName})`
-    );
-    
-    if (!results.length) return [];
-    
-    return results[0].values.map(row => ({
-      cid: row[0],
-      name: row[1],
-      type: row[2],
-      notnull: row[3],
-      dflt_value: row[4],
-      pk: row[5],
-    }));
-  }
-  
-  /**
-   * Close a database and free memory
-   */
-  closeDatabase(databaseName: string): void {
-    const db = this.databases.get(databaseName);
-    if (db) {
-      db.close();
-      this.databases.delete(databaseName);
-    }
-  }
-  
-  /**
-   * Close all databases
-   */
-  closeAll(): void {
-    this.databases.forEach(db => db.close());
-    this.databases.clear();
-  }
-}
-
-export const databaseService = DatabaseService.getInstance();
-
-// React Hook for database operations
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-
-export function useDatabase(config: DatabaseConfig) {
-  const queryClient = useQueryClient();
-  
-  // Initialize database
-  const { data: database, isLoading: isInitializing } = useQuery({
-    queryKey: ['database', config.name],
-    queryFn: () => databaseService.getDatabase(config),
-    staleTime: Infinity,
-  });
-  
-  // Execute query
-  const executeQuery = useMutation({
-    mutationFn: (query: string) =>
-      databaseService.executeQuery(config.name, query),
-    onError: (error) => {
-      console.error('Query execution error:', error);
-    },
-  });
-  
-  // Reset database
-  const resetDatabase = useMutation({
-    mutationFn: () => databaseService.resetDatabase(config),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['database', config.name] });
-    },
-  });
-  
-  // Get table names
-  const { data: tableNames = [] } = useQuery({
-    queryKey: ['database', config.name, 'tables'],
-    queryFn: () => databaseService.getTableNames(config.name),
-    enabled: !!database,
-  });
-  
-  return {
-    database,
-    isInitializing,
-    executeQuery: executeQuery.mutateAsync,
-    isExecuting: executeQuery.isPending,
-    queryError: executeQuery.error,
-    queryResult: executeQuery.data,
-    resetDatabase: resetDatabase.mutateAsync,
-    isResetting: resetDatabase.isPending,
-    tableNames,
-  };
 }

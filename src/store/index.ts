@@ -61,7 +61,7 @@ const initialState: AppState = {
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       ...initialState,
       
       // User Actions

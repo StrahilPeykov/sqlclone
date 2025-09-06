@@ -54,7 +54,9 @@ export function DataTable({
     ? displayValues.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
     : displayValues;
   
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    // reference param to satisfy noUnusedParameters
+    void _event;
     setPage(newPage);
   };
   

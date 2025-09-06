@@ -36,7 +36,7 @@ export function Sidebar({ open }: SidebarProps) {
   });
   
   const user = useAppStore((state) => state.user);
-  const { data: components = [], isLoading } = useAllComponents();
+  const { data: components = [] } = useAllComponents();
   
   // Group components by type
   const groupedComponents = useMemo(() => {

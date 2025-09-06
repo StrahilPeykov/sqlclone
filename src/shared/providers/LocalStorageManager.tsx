@@ -73,7 +73,7 @@ export function useLocalStorageState<T>(
   key: string,
   initialValue: T
 ): [T, (value: T | ((prev: T) => T)) => void] {
-  const { initialized, localStorage, setLocalStorage } = useLocalStorageContext();
+  const { localStorage, setLocalStorage } = useLocalStorageContext();
   
   const setValue = React.useCallback(
     (newValue: T | ((prev: T) => T)) => {

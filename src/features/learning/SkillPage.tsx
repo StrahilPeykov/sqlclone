@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -9,14 +9,17 @@ import {
   Typography,
   Alert,
   Snackbar,
+  CircularProgress,
 } from '@mui/material';
 import { PlayArrow, CheckCircle, ArrowBack } from '@mui/icons-material';
+
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
-import { useDatabase } from '@/features/database/DatabaseService';
-import { databaseConfigs } from '@/features/database/schemas';
 import { useAppStore } from '@/store';
-import { loadSkillsLibrary } from '@/features/content/contentIndex';
+import { useComponentMeta, useSkillContent } from '@/features/content/ContentService';
+import { exerciseService, ExerciseState } from '@/features/exercises/ExerciseService';
+import { getDatabaseConfigForSkill } from '@/features/database/schemas';
+import { useDatabase } from '@/features/database/hooks/useDatabase';
 
 export default function SkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
@@ -24,107 +27,123 @@ export default function SkillPage() {
   const updateProgress = useAppStore((s) => s.updateProgress);
   const user = useAppStore((s) => s.user);
 
-  // Load a simple skill exercise from content library (first filtering exercise)
-  const [exerciseState, setExerciseState] = useState<any | null>(null);
-  const [exerciseDef, setExerciseDef] = useState<any | null>(null);
+  // Content loading
+  const { data: skillMeta, isLoading: metaLoading } = useComponentMeta(skillId || '');
+  const { data: skillContent, isLoading: contentLoading } = useSkillContent(skillId || '');
+
+  // Exercise state
+  const [exerciseState, setExerciseState] = useState<ExerciseState | null>(null);
   const [query, setQuery] = useState('');
+  const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
-  // Decide database config based on exercise config
-  const dbConfig = useMemo(() => {
-    const target = exerciseDef?.config?.database as string | undefined;
-    if (target === 'companies') return databaseConfigs.basic;
-    if (target === 'positions') return databaseConfigs.intermediate;
-    return databaseConfigs.basic;
-  }, [exerciseDef]);
-
-  const { executeQuery, queryResult, queryError, isExecuting } = useDatabase(dbConfig);
-
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info';
-  }>({ open: false, message: '', severity: 'info' });
+  // Database setup
+  const dbConfig = getDatabaseConfigForSkill(skillId || '');
+  const { executeQuery, queryResult, queryError, isLoading: isExecuting } = useDatabase(dbConfig);
 
   const isCompleted = user?.progress[skillId || '']?.completed || false;
 
   useEffect(() => {
-    // Touch progress for lastAccessed tracking
     if (skillId) {
       updateProgress(skillId, { type: 'skill' });
     }
   }, [skillId, updateProgress]);
 
-  // Generate the exercise from content on mount/change
+  // Generate exercise when skill content loads
   useEffect(() => {
-    // Only handle known skill for now
-    if (!skillId) return;
-    loadSkillsLibrary().then((lib) => {
-      const exercises = lib?.exercises || [];
-      const first = exercises[0];
-      if (!first) return;
-
-      // Build utils the content generator expects
-      const utils = {
-        selectRandomly: <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)],
-        generateRandomNumber: (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min,
-      };
-
-      try {
-        // Compile generator function
-        const genFn = (new Function('utils', `${first.generator}; return generate;`))(utils);
-        const state = genFn(utils);
-        setExerciseState(state);
-        setExerciseDef(first);
-
-        // Seed the editor with the solution template if present
-        if (first.solutionTemplate) {
-          // Replace handlebars-like placeholders {{var}}
-          const seeded = first.solutionTemplate.replace(/{{\s*(\w+)\s*}}/g, (_m: string, key: string) => String(state?.[key] ?? ''));
-          setQuery(seeded);
-        }
-      } catch (err) {
-        console.error('Failed to initialize exercise:', err);
-      }
-    });
-  }, [skillId]);
+    if (skillContent && skillContent.exercises && skillContent.exercises.length > 0) {
+      const firstExercise = skillContent.exercises[0];
+      exerciseService.generateExercise(firstExercise)
+        .then((state) => {
+          setExerciseState(state);
+          
+          // Set initial query from solution template if available
+          if (firstExercise.solutionTemplate && state.state) {
+            const template = firstExercise.solutionTemplate.replace(
+              /{{\s*(\w+)\s*}}/g, 
+              (_, key) => String(state.state[key] ?? '')
+            );
+            setQuery(template);
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to generate exercise:', error);
+          setFeedback({ 
+            message: 'Failed to generate exercise', 
+            type: 'error' 
+          });
+        });
+    }
+  }, [skillContent]);
 
   const handleExecute = async () => {
+    if (!exerciseState || !skillContent?.exercises?.[0]) return;
+
+    setIsValidating(true);
+    setFeedback(null);
+
     try {
-      const res = await executeQuery(query);
-
-      // Validate via content validator if available
-      let ok = false;
-      if (exerciseDef?.validator) {
-        try {
-          const validateFn = (new Function('input', 'state', 'result', `${exerciseDef.validator}; return validate(input, state, result);`));
-          ok = !!validateFn(query, exerciseState, res);
-        } catch (e) {
-          console.error('Validator error:', e);
-          ok = false;
-        }
-      } else {
-        // Fallback: any result rows means success
-        ok = Array.isArray(res) && res.length > 0 && res[0].values.length > 0;
-      }
-
-      if (ok && skillId && !isCompleted) {
+      await executeQuery(query);
+      
+      // Validate the exercise
+      const validation = await exerciseService.validateExercise(
+        skillContent.exercises[0],
+        exerciseState,
+        query
+      );
+      
+      if (validation.correct && skillId && !isCompleted) {
         updateProgress(skillId, { type: 'skill', completed: true });
-        setSnackbar({ open: true, message: 'Great job! Skill completed.', severity: 'success' });
+        setFeedback({ 
+          message: 'Excellent! Exercise completed successfully!', 
+          type: 'success' 
+        });
       } else {
-        setSnackbar({
-          open: true,
-          message: ok ? 'Query ran successfully.' : 'Query ran, but did not meet the goal.',
-          severity: ok ? 'success' : 'info',
+        setFeedback({
+          message: validation.feedback || 'Try again!',
+          type: validation.correct ? 'success' : 'info'
         });
       }
-    } catch (e: any) {
-      setSnackbar({
-        open: true,
-        message: e?.message || 'Query failed',
-        severity: 'error',
+    } catch (error: any) {
+      setFeedback({
+        message: error?.message || 'Query failed',
+        type: 'error',
       });
+    } finally {
+      setIsValidating(false);
     }
   };
+
+  const handleNewExercise = async () => {
+    if (!skillContent?.exercises?.[0]) return;
+    
+    try {
+      const newState = await exerciseService.resetExercise(skillContent.exercises[0]);
+      setExerciseState(newState);
+      setQuery('');
+      setFeedback(null);
+    } catch (error) {
+      console.error('Failed to generate new exercise:', error);
+    }
+  };
+
+  if (metaLoading || contentLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 3, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  if (!skillMeta) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Alert severity="error">
+          Skill not found. <Button onClick={() => navigate('/learn')}>Return to learning</Button>
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -134,34 +153,72 @@ export default function SkillPage() {
           Back to Learning
         </Button>
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          {skillId || 'Skill'}
+          {skillMeta.name}
           {isCompleted && <CheckCircle color="success" sx={{ ml: 1 }} />}
         </Typography>
       </Box>
 
       {/* Description */}
-      <Alert severity="info" sx={{ mb: 2 }}>
-        {exerciseState?.description || 'Solve the task by writing a SQL query.'}
-      </Alert>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body1" color="text.secondary">
+          {skillMeta.description}
+        </Typography>
+        {skillMeta.estimatedTime && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Estimated time: {skillMeta.estimatedTime} minutes
+          </Typography>
+        )}
+      </Box>
+
+      {/* Exercise Description */}
+      {exerciseState?.state?.description && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {exerciseState.state.description}
+        </Alert>
+      )}
+
+      {/* Theory Section */}
+      {skillContent?.theory && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>Theory</Typography>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+              {skillContent.theory}
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Editor Card */}
       <Card sx={{ mb: 2 }}>
-        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between' }}>
+        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="subtitle2" sx={{ alignSelf: 'center', ml: 1 }}>
             Write your SQL below
           </Typography>
-          <Button
-            startIcon={<PlayArrow />}
-            onClick={handleExecute}
-            disabled={!query.trim() || isExecuting}
-            variant="contained"
-            sx={{ mr: 1 }}
-          >
-            Run
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              startIcon={<PlayArrow />}
+              onClick={handleExecute}
+              disabled={!query.trim() || isExecuting || isValidating}
+              variant="contained"
+            >
+              {isValidating ? 'Checking...' : 'Run & Check'}
+            </Button>
+            {exerciseState && (
+              <Button variant="outlined" onClick={handleNewExercise}>
+                New Exercise
+              </Button>
+            )}
+          </Box>
         </Box>
         <CardContent sx={{ p: 0 }}>
-          <SQLEditor value={query} onChange={setQuery} height="260px" onExecute={handleExecute} />
+          <SQLEditor 
+            value={query} 
+            onChange={setQuery} 
+            height="260px" 
+            onExecute={handleExecute}
+            showResults={false}
+          />
         </CardContent>
       </Card>
 
@@ -186,11 +243,23 @@ export default function SkillPage() {
         </CardContent>
       </Card>
 
+      {/* Exercise Statistics */}
+      {exerciseState && (
+        <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Attempts: {exerciseState.attempts} • 
+            Status: {exerciseState.completed ? 'Completed' : 'In Progress'} •
+            Started: {exerciseState.startTime.toLocaleTimeString()}
+          </Typography>
+        </Box>
+      )}
+
+      {/* Feedback Snackbar */}
       <Snackbar
-        open={snackbar.open}
-        autoHideDuration={2500}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        message={snackbar.message}
+        open={!!feedback}
+        autoHideDuration={4000}
+        onClose={() => setFeedback(null)}
+        message={feedback?.message}
       />
     </Container>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -15,6 +15,7 @@ import {
   IconButton,
   Tooltip,
   Snackbar,
+  Container,
 } from '@mui/material';
 import {
   PlayArrow,
@@ -22,13 +23,13 @@ import {
   ContentCopy,
   Clear,
   Download,
-  Upload,
   Info,
 } from '@mui/icons-material';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
-import { useDatabase } from '@/features/database/DatabaseService';
+import { useDatabase } from '@/features/database/hooks/useDatabase';
 import { databaseConfigs } from '@/features/database/schemas';
+import { useLocalStorage } from '@/shared/hooks';
 
 interface QueryHistory {
   query: string;
@@ -41,8 +42,8 @@ export default function PlaygroundPage() {
   const [selectedDatabase, setSelectedDatabase] = useState<keyof typeof databaseConfigs>('intermediate');
   const [query, setQuery] = useState('SELECT * FROM companies LIMIT 10;');
   const [currentTab, setCurrentTab] = useState(0);
-  const [history, setHistory] = useState<QueryHistory[]>([]);
-  const [savedQueries, setSavedQueries] = useState<{ name: string; query: string }[]>([]);
+  const [history, setHistory] = useLocalStorage<QueryHistory[]>('sql-playground-history', []);
+  const [savedQueries, setSavedQueries] = useLocalStorage<{ name: string; query: string }[]>('sql-playground-queries', []);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
     open: false,
     message: '',
@@ -53,33 +54,24 @@ export default function PlaygroundPage() {
     executeQuery,
     queryResult,
     queryError,
-    isExecuting,
+    isLoading: isExecuting,
     tableNames,
     resetDatabase,
   } = useDatabase(databaseConfigs[selectedDatabase]);
-  
-  // Load saved queries from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('sql-playground-queries');
-    if (saved) {
-      setSavedQueries(JSON.parse(saved));
-    }
-  }, []);
   
   const handleExecute = async () => {
     try {
       const result = await executeQuery(query);
       
       // Add to history
-      setHistory((prev) => [
-        {
-          query,
-          timestamp: new Date(),
-          success: true,
-          rowCount: result?.[0]?.values?.length || 0,
-        },
-        ...prev.slice(0, 49), // Keep last 50 queries
-      ]);
+      const newHistoryEntry: QueryHistory = {
+        query,
+        timestamp: new Date(),
+        success: true,
+        rowCount: result?.[0]?.values?.length || 0,
+      };
+      
+      setHistory((prev) => [newHistoryEntry, ...prev.slice(0, 49)]); // Keep last 50 queries
       
       setSnackbar({
         open: true,
@@ -87,14 +79,13 @@ export default function PlaygroundPage() {
         severity: 'success',
       });
     } catch (error) {
-      setHistory((prev) => [
-        {
-          query,
-          timestamp: new Date(),
-          success: false,
-        },
-        ...prev.slice(0, 49),
-      ]);
+      const newHistoryEntry: QueryHistory = {
+        query,
+        timestamp: new Date(),
+        success: false,
+      };
+      
+      setHistory((prev) => [newHistoryEntry, ...prev.slice(0, 49)]);
       
       setSnackbar({
         open: true,
@@ -109,7 +100,6 @@ export default function PlaygroundPage() {
     if (name) {
       const newSavedQueries = [...savedQueries, { name, query }];
       setSavedQueries(newSavedQueries);
-      localStorage.setItem('sql-playground-queries', JSON.stringify(newSavedQueries));
       
       setSnackbar({
         open: true,
@@ -128,13 +118,21 @@ export default function PlaygroundPage() {
     });
   };
   
-  const handleCopyQuery = () => {
-    navigator.clipboard.writeText(query);
-    setSnackbar({
-      open: true,
-      message: 'Query copied to clipboard',
-      severity: 'info',
-    });
+  const handleCopyQuery = async () => {
+    try {
+      await navigator.clipboard.writeText(query);
+      setSnackbar({
+        open: true,
+        message: 'Query copied to clipboard',
+        severity: 'info',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Failed to copy query',
+        severity: 'error',
+      });
+    }
   };
   
   const handleClearQuery = () => {
@@ -147,7 +145,7 @@ export default function PlaygroundPage() {
     const data = queryResult[0];
     const csv = [
       data.columns.join(','),
-      ...data.values.map((row) => row.map((cell: any) => JSON.stringify(cell)).join(',')),
+      ...data.values.map((row: any[]) => row.map((cell: any) => JSON.stringify(cell)).join(',')),
     ].join('\n');
     
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -167,17 +165,35 @@ export default function PlaygroundPage() {
   
   const handleResetDatabase = async () => {
     if (confirm('Are you sure you want to reset the database to its initial state?')) {
-      await resetDatabase();
-      setSnackbar({
-        open: true,
-        message: 'Database reset successfully',
-        severity: 'success',
-      });
+      try {
+        await resetDatabase();
+        setSnackbar({
+          open: true,
+          message: 'Database reset successfully',
+          severity: 'success',
+        });
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: 'Failed to reset database',
+          severity: 'error',
+        });
+      }
     }
   };
   
+  const handleDeleteSavedQuery = (index: number) => {
+    const newSavedQueries = savedQueries.filter((_, i) => i !== index);
+    setSavedQueries(newSavedQueries);
+    setSnackbar({
+      open: true,
+      message: 'Query deleted',
+      severity: 'info',
+    });
+  };
+  
   return (
-    <Box>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
@@ -189,7 +205,7 @@ export default function PlaygroundPage() {
       </Box>
       
       {/* Database Selector and Actions */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 2 }}>
         <FormControl sx={{ minWidth: 200 }}>
           <InputLabel>Database</InputLabel>
           <Select
@@ -257,6 +273,7 @@ export default function PlaygroundPage() {
           onChange={setQuery}
           height="300px"
           onExecute={handleExecute}
+          showResults={false}
         />
       </Paper>
       
@@ -294,25 +311,34 @@ export default function PlaygroundPage() {
                   <Paper
                     key={index}
                     sx={{
-                      p: 1,
+                      p: 2,
                       mb: 1,
-                      bgcolor: item.success ? 'action.hover' : 'error.main',
+                      bgcolor: item.success ? 'action.hover' : 'error.light',
                       cursor: 'pointer',
                       '&:hover': { bgcolor: 'action.selected' },
                     }}
                     onClick={() => setQuery(item.query)}
                   >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                        {item.query.substring(0, 100)}...
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontFamily: 'monospace',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: '70%'
+                        }}
+                      >
+                        {item.query}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(item.timestamp).toLocaleTimeString()}
+                        {new Date(item.timestamp).toLocaleString()}
                       </Typography>
                     </Box>
                     {item.success && item.rowCount !== undefined && (
                       <Typography variant="caption" color="text.secondary">
-                        {item.rowCount} rows
+                        {item.rowCount} rows returned
                       </Typography>
                     )}
                   </Paper>
@@ -334,20 +360,35 @@ export default function PlaygroundPage() {
                     sx={{
                       p: 2,
                       mb: 1,
-                      cursor: 'pointer',
                       '&:hover': { bgcolor: 'action.hover' },
                     }}
-                    onClick={() => handleLoadQuery(saved)}
                   >
-                    <Typography variant="subtitle2" gutterBottom>
-                      {saved.name}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ fontFamily: 'monospace', color: 'text.secondary' }}
-                    >
-                      {saved.query.substring(0, 100)}...
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box sx={{ flexGrow: 1, cursor: 'pointer' }} onClick={() => handleLoadQuery(saved)}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          {saved.name}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ 
+                            fontFamily: 'monospace', 
+                            color: 'text.secondary',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {saved.query}
+                        </Typography>
+                      </Box>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteSavedQuery(index)}
+                      >
+                        Delete
+                      </Button>
+                    </Box>
                   </Paper>
                 ))
               ) : (
@@ -367,6 +408,6 @@ export default function PlaygroundPage() {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         message={snackbar.message}
       />
-    </Box>
+    </Container>
   );
 }

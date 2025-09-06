@@ -7,43 +7,21 @@ import {
   CardActions,
   Button,
   Grid,
+  CircularProgress,
 } from '@mui/material';
 import { CheckCircle, PlayArrow } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store';
-import { ContentEntryMeta, loadContentIndex } from '@/features/content/contentIndex';
-import { useEffect, useMemo, useState } from 'react';
+import { useContentIndex } from '@/features/content/ContentService';
 
 export default function LearningOverviewPage() {
   const navigate = useNavigate();
   const user = useAppStore((state) => state.user);
+  
+  const { data: contentIndex, isLoading, error } = useContentIndex();
 
-  const [index, setIndex] = useState<ContentEntryMeta[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    loadContentIndex()
-      .then((data) => {
-        if (mounted) setIndex(data);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const concepts: Pick<ContentEntryMeta, 'id' | 'name' | 'prerequisites'>[] = useMemo(() => (
-    (index || [])
-      .filter((e) => e.type === 'concept')
-      .map((e) => ({ id: e.id, name: e.name, prerequisites: e.prerequisites || [] }))
-  ), [index]);
-
-  const skills: Pick<ContentEntryMeta, 'id' | 'name' | 'prerequisites'>[] = useMemo(() => (
-    (index || [])
-      .filter((e) => e.type === 'skill')
-      .map((e) => ({ id: e.id, name: e.name, prerequisites: e.prerequisites || [] }))
-  ), [index]);
+  const concepts = contentIndex?.filter((item) => item.type === 'concept') || [];
+  const skills = contentIndex?.filter((item) => item.type === 'skill') || [];
 
   const isCompleted = (id: string) => {
     return user?.progress[id]?.completed || false;
@@ -51,7 +29,6 @@ export default function LearningOverviewPage() {
 
   const renderItem = (item: any, type: 'concept' | 'skill') => {
     const completed = isCompleted(item.id);
-    const accessible = true; // Always unlocked
     
     return (
       <Grid item xs={12} sm={6} md={4} key={item.id}>
@@ -65,7 +42,6 @@ export default function LearningOverviewPage() {
               transform: 'translateY(-2px)',
               boxShadow: 2,
             },
-            opacity: 1,
           }}
         >
           <CardContent sx={{ pb: 1, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
@@ -84,17 +60,35 @@ export default function LearningOverviewPage() {
                   sx={{ 
                     fontWeight: 500,
                     color: completed ? 'text.secondary' : 'text.primary',
-                    mb: item.prerequisites.length > 0 ? 1 : 0,
+                    mb: 1,
                   }}
                 >
                   {item.name}
                 </Typography>
                 
-                {item.prerequisites.length > 0 && (
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
+                  {item.description}
+                </Typography>
+                
+                {item.estimatedTime && (
                   <Typography 
                     variant="caption" 
                     color="text.secondary"
                     sx={{ display: 'block' }}
+                  >
+                    {item.estimatedTime} minutes
+                  </Typography>
+                )}
+                
+                {item.prerequisites && item.prerequisites.length > 0 && (
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ display: 'block', mt: 0.5 }}
                   >
                     Prerequisites: {item.prerequisites.join(', ')}
                   </Typography>
@@ -122,14 +116,27 @@ export default function LearningOverviewPage() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography color="error" sx={{ mb: 2 }}>
+          Failed to load content: {error instanceof Error ? error.message : 'Unknown error'}
+        </Typography>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
-      )}
-      {/* Simple Header */}
+      {/* Header */}
       <Box sx={{ mb: 6, textAlign: 'center' }}>
         <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
           Learn SQL
@@ -137,6 +144,26 @@ export default function LearningOverviewPage() {
         <Typography variant="h6" color="text.secondary">
           Start with concepts, then practice with skills
         </Typography>
+      </Box>
+
+      {/* Progress Summary */}
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', gap: 4 }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h4" color="primary">
+            {concepts.filter(c => isCompleted(c.id)).length}/{concepts.length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Concepts Completed
+          </Typography>
+        </Box>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h4" color="primary">
+            {skills.filter(s => isCompleted(s.id)).length}/{skills.length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Skills Mastered
+          </Typography>
+        </Box>
       </Box>
 
       {/* Concepts */}

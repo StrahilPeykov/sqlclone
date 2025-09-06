@@ -1,113 +1,115 @@
 import { useState, useCallback, useEffect } from 'react';
-import initSqlJs, { Database } from 'sql.js';
-
-interface QueryResult {
-  columns: string[];
-  values: any[][];
-}
+import { DatabaseService, DatabaseConfig, QueryResult } from '../DatabaseService';
 
 interface UseDatabaseReturn {
-  database: Database | null;
+  database: any | null;
   isLoading: boolean;
+  isExecuting: boolean;
   error: string | null;
+  queryResult: QueryResult[] | null;
+  queryError: Error | null;
   executeQuery: (query: string) => Promise<QueryResult[]>;
   resetDatabase: () => Promise<void>;
-}
-
-// Global SQL.js instance
-let SQL: any = null;
-let isInitializing = false;
-const initPromise: Promise<any> | null = null;
-
-async function initializeSQLJS() {
-  if (SQL) return SQL;
-  if (isInitializing) return initPromise;
-  
-  isInitializing = true;
-  
-  try {
-    SQL = await initSqlJs({
-      locateFile: (file: string) => `/sqljs/${file}`,
-    });
-    return SQL;
-  } catch (error) {
-    isInitializing = false;
-    throw error;
-  }
+  tableNames: string[];
 }
 
 export function useDatabase(
-  databaseName: string = 'default',
+  config: DatabaseConfig | string = 'default',
   schema?: string
 ): UseDatabaseReturn {
-  const [database, setDatabase] = useState<Database | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tableNames, setTableNames] = useState<string[]>([]);
+  const [database, setDatabase] = useState<any>(null);
+  const [queryResult, setQueryResult] = useState<QueryResult[] | null>(null);
+  const [queryError, setQueryError] = useState<Error | null>(null);
+
+  // Normalize config
+  const dbConfig: DatabaseConfig = typeof config === 'string' 
+    ? { name: config, schema }
+    : (schema ? { ...config, schema } : config);
+
+  const dbService = DatabaseService.getInstance();
 
   // Initialize database
-  const initDatabase = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  useEffect(() => {
+    const initDatabase = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      const SQL = await initializeSQLJS();
-      const db = new SQL.Database();
-
-      // Apply schema if provided
-      if (schema) {
-        db.run(schema);
+        // Wait for SQL.js to be ready
+        await dbService.initialize();
+        
+        // Create/get database
+        const db = await dbService.getDatabase(dbConfig);
+        setDatabase(db);
+        
+        // Get table names
+        const tables = await dbService.getTableNames(dbConfig.name);
+        setTableNames(tables);
+        
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to initialize database');
+        console.error('Database initialization error:', err);
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      setDatabase(db);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initialize database');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [schema]);
+    initDatabase();
+  }, [dbConfig.name, dbConfig.schema]);
 
   // Execute query
   const executeQuery = useCallback(async (query: string): Promise<QueryResult[]> => {
-    if (!database) {
-      throw new Error('Database not initialized');
+    if (!dbService.isReady()) {
+      throw new Error('Database service not ready');
     }
 
     try {
-      const results = database.exec(query);
-      return results.map(result => ({
-        columns: result.columns,
-        values: result.values,
-      }));
+      setIsExecuting(true);
+      setQueryError(null);
+      const res = await dbService.executeQuery(dbConfig.name, query);
+      setQueryResult(res);
+      return res;
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Query execution failed');
+      const e = err instanceof Error ? err : new Error('Query execution failed');
+      setQueryError(e);
+      console.error('Query execution error:', e);
+      throw e;
+    } finally {
+      setIsExecuting(false);
     }
-  }, [database]);
+  }, [dbConfig.name]);
 
   // Reset database
   const resetDatabase = useCallback(async () => {
-    if (database) {
-      database.close();
+    try {
+      setIsLoading(true);
+      await dbService.resetDatabase(dbConfig);
+      setQueryResult(null);
+      setQueryError(null);
+      
+      // Refresh table names
+      const tables = await dbService.getTableNames(dbConfig.name);
+      setTableNames(tables);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset database');
+    } finally {
+      setIsLoading(false);
     }
-    await initDatabase();
-  }, [database, initDatabase]);
-
-  // Initialize on mount
-  useEffect(() => {
-    initDatabase();
-    
-    // Cleanup on unmount
-    return () => {
-      if (database) {
-        database.close();
-      }
-    };
-  }, [initDatabase]);
+  }, [dbConfig]);
 
   return {
     database,
     isLoading,
+    isExecuting,
     error,
+    queryResult,
+    queryError,
     executeQuery,
     resetDatabase,
+    tableNames,
   };
 }

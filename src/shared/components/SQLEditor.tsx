@@ -12,6 +12,7 @@ interface SQLEditorProps {
   readOnly?: boolean;
   autoFocus?: boolean;
   onExecute?: () => void;
+  showResults?: boolean; // accepted for compatibility, no-op here
 }
 
 export function SQLEditor({

@@ -19,6 +19,7 @@ export const ConceptContentSchema = z.object({
     content: z.string(),
   })).optional(),
   visualizations: z.array(z.any()).optional(),
+  nextConcepts: z.array(z.string()).optional(),
 });
 
 export const ExerciseSchema = z.object({

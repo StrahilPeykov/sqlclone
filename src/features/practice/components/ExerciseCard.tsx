@@ -3,7 +3,6 @@ import {
   Card,
   CardContent,
   Typography,
-  TextField,
   Button,
   Box,
   Alert,
@@ -12,13 +11,12 @@ import {
 } from '@mui/material';
 import {
   Check as CheckIcon,
-  Close as CloseIcon,
   Lightbulb as HintIcon,
   Refresh as ResetIcon,
 } from '@mui/icons-material';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
-import { useDatabase } from '@/features/database/DatabaseService';
+import { useDatabase } from '@/features/database/hooks/useDatabase';
 
 interface ExerciseCardProps {
   exercise: {
