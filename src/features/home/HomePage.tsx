@@ -25,7 +25,7 @@ export default function HomePage() {
         sx={{
           p: 6,
           mb: 4,
-          background: 'linear-gradient(135deg, #c81919 0%, #960000 100%)',
+          background: 'linear-gradient(135deg, #c8102e 0%, #960000 100%)',
           color: 'white',
           borderRadius: 3,
           textAlign: 'center',

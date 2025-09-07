@@ -2,6 +2,18 @@ import { create } from 'zustand';
 import { useCallback, useState, useEffect } from 'react';
 import { persist } from 'zustand/middleware';
 
+interface QueryHistory {
+  query: string;
+  timestamp: Date;
+  success: boolean;
+  rowCount?: number;
+}
+
+interface SavedQuery {
+  name: string;
+  query: string;
+}
+
 interface ComponentState {
   // Component ID
   id?: string;
@@ -14,9 +26,16 @@ interface ComponentState {
   numSolved?: number;
   exerciseHistory?: any[];
   
+  // For playground
+  savedQueries?: SavedQuery[];
+  history?: QueryHistory[];
+  
   // Common
   lastAccessed?: Date;
-  type?: 'concept' | 'skill';
+  type?: 'concept' | 'skill' | 'playground';
+  
+  // Allow any additional properties for extensibility
+  [key: string]: any;
 }
 
 interface AppState {
@@ -127,3 +146,6 @@ export function useIsStoreReady() {
   
   return isReady;
 }
+
+// Export types for use in components
+export type { ComponentState, QueryHistory, SavedQuery };

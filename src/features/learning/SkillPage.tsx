@@ -16,8 +16,7 @@ import { PlayArrow, CheckCircle, ArrowBack, Refresh, ArrowForward } from '@mui/i
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
 import { useComponentState } from '@/store';
-import { useDatabase } from '@/shared/hooks/useDatabase';
-import { schemas } from '@/features/database/schemas';
+import { useExerciseDatabase } from '@/shared/hooks/useDatabase';
 import { loadSkillsLibrary } from '@/features/content/contentIndex';
 import type { SkillContent, Exercise as ContentExercise } from '@/features/content/types';
 
@@ -45,22 +44,21 @@ export default function SkillPage() {
   const [query, setQuery] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showHint, setShowHint] = useState(false);
-  const [selectedSchemaKey, setSelectedSchemaKey] = useState<keyof typeof schemas>('companies');
   const [exerciseCompleted, setExerciseCompleted] = useState(false);
   
   // Skill metadata
   const [skillMeta, setSkillMeta] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Database setup - driven by exercise config
+  // Database setup - using the new exercise database hook
   const { 
     executeQuery, 
     queryResult, 
     queryError, 
     isReady: dbReady,
     isExecuting,
-    // resetDatabase 
-  } = useDatabase(schemas[selectedSchemaKey]);
+    tableNames,
+  } = useExerciseDatabase(skillId || '');
   
   // Required exercises to mark skill as complete: cap by available exercises, default 3
   const requiredCount = Math.min(3, skillContent?.exercises?.length ?? 3);
@@ -162,16 +160,12 @@ export default function SkillPage() {
       state,
     };
 
-    // Update DB schema based on exercise config
-    const dbKey = (instance.config.database as keyof typeof schemas) || 'companies';
-    setSelectedSchemaKey(dbKey in schemas ? dbKey : 'companies');
-
     setCurrentExercise(instance);
     setQuery('');
     setFeedback(null);
     setShowHint(false);
     setExerciseCompleted(false);
-  }, [skillContent, componentState.exerciseHistory]);
+  }, [skillContent, componentState.exerciseHistory, genUtils]);
 
   // Initialize first exercise when DB ready
   useEffect(() => {
@@ -323,7 +317,6 @@ export default function SkillPage() {
         <Typography variant="body1" color="text.secondary">
           {skillMeta.description}
         </Typography>
-        {/* Estimated time removed */}
       </Box>
 
       {/* Progress */}
@@ -331,6 +324,15 @@ export default function SkillPage() {
         Progress: {Math.min(componentState.numSolved || 0, requiredCount)}/{requiredCount} exercises completed
         {isCompleted && ' - Skill mastered!'}
       </Alert>
+
+      {/* Database Info */}
+      {tableNames.length > 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Typography variant="body2">
+            <strong>Available tables:</strong> {tableNames.join(', ')}
+          </Typography>
+        </Alert>
+      )}
 
       {/* Exercise Description */}
       {currentExercise && (

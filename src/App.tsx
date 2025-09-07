@@ -1,10 +1,11 @@
-import { StrictMode, useEffect, useMemo, useContext } from 'react';
+import { StrictMode, useEffect, useMemo } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { router } from './router';
 import { getTheme, ColorModeContext } from './theme';
 import { SQLJSProvider } from './shared/providers/SQLJSProvider';
+import { DatabaseProvider } from './shared/providers/DatabaseProvider';
 import { ErrorBoundary } from './shared/components/ErrorBoundary';
 import { useAppStore } from './store';
 
@@ -27,7 +28,9 @@ export function App() {
           <ThemeProvider theme={muiTheme}>
             <CssBaseline />
             <SQLJSProvider>
-              <RouterProvider router={router} />
+              <DatabaseProvider>
+                <RouterProvider router={router} />
+              </DatabaseProvider>
             </SQLJSProvider>
           </ThemeProvider>
         </ColorModeContext.Provider>

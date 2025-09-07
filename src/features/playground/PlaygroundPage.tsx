@@ -24,8 +24,8 @@ import {
 } from '@mui/icons-material';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
-import { useDatabase } from '@/shared/hooks/useDatabase';
-import { schemas } from '@/features/database/schemas';
+import { usePlaygroundDatabase } from '@/shared/hooks/useDatabase';
+import { schemas, getSchemaDescription, type SchemaKey } from '@/features/database/schemas';
 import { useAppStore } from '@/store';
 
 interface QueryHistory {
@@ -36,16 +36,12 @@ interface QueryHistory {
 }
 
 export default function PlaygroundPage() {
-  const [selectedSchema, setSelectedSchema] = useState<keyof typeof schemas>('companies');
+  const [selectedSchema, setSelectedSchema] = useState<SchemaKey>('companiesAndPositions');
   const [query, setQuery] = useState('SELECT * FROM companies LIMIT 10;');
   const [currentTab, setCurrentTab] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   
-  // Get saved queries from store
-  const savedQueries = useAppStore(state => state.components.playground?.savedQueries || []);
-  const updatePlayground = useAppStore(state => state.updateComponent);
-  
-  // Use simplified database hook
+  // Use the new playground database hook
   const {
     executeQuery,
     queryResult,
@@ -54,7 +50,11 @@ export default function PlaygroundPage() {
     tableNames,
     resetDatabase,
     isReady
-  } = useDatabase(schemas[selectedSchema]);
+  } = usePlaygroundDatabase(selectedSchema);
+  
+  // Get saved queries from store
+  const savedQueries = useAppStore(state => state.components.playground?.savedQueries || []);
+  const updatePlayground = useAppStore(state => state.updateComponent);
   
   // Get history from store
   const history: QueryHistory[] = useAppStore(state => 
@@ -141,21 +141,30 @@ export default function PlaygroundPage() {
   };
   
   const handleResetDatabase = () => {
-    if (confirm('Are you sure you want to reset the database to its initial state?')) {
+    if (confirm('Are you sure you want to reset the database to its initial state? This will lose all your changes.')) {
       resetDatabase();
       setMessage('Database reset successfully');
     }
   };
   
-  const handleSchemaChange = (newSchema: keyof typeof schemas) => {
+  const handleSchemaChange = (newSchema: SchemaKey) => {
     setSelectedSchema(newSchema);
-    setQuery(`SELECT * FROM ${newSchema} LIMIT 10;`);
+    // Update the default query based on the new schema
+    const firstTable = getFirstTableFromSchema(newSchema);
+    setQuery(`SELECT * FROM ${firstTable} LIMIT 10;`);
   };
   
   const handleDeleteSavedQuery = (index: number) => {
     const newSavedQueries = savedQueries.filter((_: any, i: number) => i !== index);
     updatePlayground('playground', { savedQueries: newSavedQueries });
     setMessage('Query deleted');
+  };
+
+  // Helper to get first table name from schema
+  const getFirstTableFromSchema = (schemaKey: SchemaKey): string => {
+    const schema = schemas[schemaKey];
+    const match = schema.match(/CREATE TABLE (\w+)/);
+    return match ? match[1] : 'companies';
   };
   
   return (
@@ -166,23 +175,30 @@ export default function PlaygroundPage() {
           SQL Playground
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Experiment with SQL queries on sample databases. Your changes are temporary and won't affect exercises.
+          Experiment with SQL queries on sample databases. Your changes persist until you reset.
         </Typography>
       </Box>
       
       {/* Database Selector */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Database</InputLabel>
+        <FormControl sx={{ minWidth: 250 }}>
+          <InputLabel>Database Schema</InputLabel>
           <Select
             value={selectedSchema}
-            onChange={(e) => handleSchemaChange(e.target.value as keyof typeof schemas)}
-            label="Database"
+            onChange={(e) => handleSchemaChange(e.target.value as SchemaKey)}
+            label="Database Schema"
             disabled={!isReady}
           >
             {Object.keys(schemas).map(schema => (
               <MenuItem key={schema} value={schema}>
-                {schema.charAt(0).toUpperCase() + schema.slice(1)}
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                    {schema.charAt(0).toUpperCase() + schema.slice(1)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {getSchemaDescription(schema as SchemaKey)}
+                  </Typography>
+                </Box>
               </MenuItem>
             ))}
           </Select>
@@ -201,7 +217,9 @@ export default function PlaygroundPage() {
       {/* Available Tables */}
       {tableNames.length > 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Available tables: {tableNames.join(', ')}
+          <Typography variant="body2">
+            <strong>Available tables:</strong> {tableNames.join(', ')}
+          </Typography>
         </Alert>
       )}
       

@@ -34,10 +34,10 @@ export function SQLEditor({
         padding: '12px',
       },
       '.cm-focused .cm-cursor': {
-        borderLeftColor: '#c81919',
+        borderLeftColor: '#c8102e',
       },
       '.cm-focused .cm-selectionBackground, ::selection': {
-        backgroundColor: '#c8191933',
+        backgroundColor: '#c8102e33',
       },
     }),
     EditorView.lineWrapping,

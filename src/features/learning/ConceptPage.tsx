@@ -11,6 +11,7 @@ import {
   Tab,
   Alert,
   CircularProgress,
+  Paper,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -19,9 +20,13 @@ import {
   School,
   Lightbulb,
   MenuBook,
+  Code,
 } from '@mui/icons-material';
 
 import { useComponentState } from '@/store';
+import { useConceptDatabase } from '@/shared/hooks/useDatabase';
+import { SQLEditor } from '@/shared/components/SQLEditor';
+import { DataTable } from '@/shared/components/DataTable';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -52,6 +57,18 @@ export default function ConceptPage() {
   
   // Use new store
   const [componentState, setComponentState] = useComponentState(conceptId || '');
+  
+  // Database for concept demonstrations
+  const { 
+    executeQuery, 
+    queryResult, 
+    queryError, 
+    isExecuting,
+    tableNames 
+  } = useConceptDatabase('companies');
+  
+  // Demo query state for interactive examples
+  const [demoQuery, setDemoQuery] = useState('SELECT * FROM companies LIMIT 5;');
   
   // Load concept metadata
   const [conceptMeta, setConceptMeta] = useState<any>(null);
@@ -95,15 +112,24 @@ export default function ConceptPage() {
   // Restore saved tab
   useEffect(() => {
     if (componentState.tab) {
-      const tabIndex = ['theory', 'summary'].indexOf(componentState.tab);
+      const tabIndex = ['theory', 'summary', 'examples'].indexOf(componentState.tab);
       if (tabIndex >= 0) setCurrentTab(tabIndex);
     }
   }, [componentState.tab]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
-    const tabNames = ['theory', 'summary'];
+    const tabNames = ['theory', 'summary', 'examples'];
     setComponentState({ tab: tabNames[newValue] });
+  };
+
+  const handleExecuteDemo = async () => {
+    try {
+      await executeQuery(demoQuery);
+    } catch (error) {
+      // Error is handled by the database hook
+      console.error('Demo query failed:', error);
+    }
   };
 
   if (isLoading) {
@@ -153,6 +179,27 @@ export default function ConceptPage() {
     });
   };
 
+  // Demo queries based on concept
+  const getDemoQueries = (conceptId: string) => {
+    const demoQueries: Record<string, string[]> = {
+      'database': [
+        'SELECT * FROM companies LIMIT 5;',
+        'SELECT COUNT(*) as total_companies FROM companies;',
+        'SELECT DISTINCT country FROM companies;'
+      ],
+      'database-table': [
+        'SELECT company_name, country FROM companies LIMIT 5;',
+        'SELECT * FROM companies WHERE country = "Netherlands";',
+        'SELECT company_name, num_employees FROM companies ORDER BY num_employees DESC LIMIT 3;'
+      ],
+      'data-types': [
+        'SELECT company_name, founded_year, num_employees FROM companies LIMIT 5;',
+        'SELECT typeof(company_name), typeof(founded_year), typeof(num_employees) FROM companies LIMIT 1;'
+      ]
+    };
+    return demoQueries[conceptId] || ['SELECT * FROM companies LIMIT 5;'];
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 2 }}>
       {/* Header */}
@@ -176,7 +223,6 @@ export default function ConceptPage() {
         <Typography variant="body1" color="text.secondary">
           {conceptMeta.description}
         </Typography>
-        {/* Estimated time removed */}
       </Box>
 
       {/* Prerequisites */}
@@ -192,6 +238,7 @@ export default function ConceptPage() {
           <Tabs value={currentTab} onChange={handleTabChange}>
             <Tab label="Theory" icon={<Lightbulb />} iconPosition="start" />
             <Tab label="Summary" icon={<MenuBook />} iconPosition="start" />
+            <Tab label="Examples" icon={<Code />} iconPosition="start" />
           </Tabs>
         </Box>
 
@@ -217,7 +264,7 @@ export default function ConceptPage() {
             
             {conceptContent?.examples && conceptContent.examples.length > 0 && (
               <>
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>Examples</Typography>
+                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>Key Examples</Typography>
                 {conceptContent.examples.map((example: any, index: number) => (
                   <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                     <Typography variant="subtitle2" gutterBottom>{example.title}</Typography>
@@ -226,6 +273,83 @@ export default function ConceptPage() {
                 ))}
               </>
             )}
+          </CardContent>
+        </TabPanel>
+
+        <TabPanel value={currentTab} index={2}>
+          <CardContent>
+            <Typography variant="h5" gutterBottom>Interactive Examples</Typography>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              Try these example queries to understand the concept better:
+            </Typography>
+
+            {/* Database Info */}
+            {tableNames.length > 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                  <strong>Available tables:</strong> {tableNames.join(', ')}
+                </Typography>
+              </Alert>
+            )}
+
+            {/* Demo Query Buttons */}
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>Quick Examples:</Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {getDemoQueries(conceptId || '').map((query, index) => (
+                  <Button
+                    key={index}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setDemoQuery(query)}
+                    sx={{ textTransform: 'none', fontFamily: 'monospace', fontSize: '0.75rem' }}
+                  >
+                    {query.length > 30 ? `${query.substring(0, 30)}...` : query}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            {/* SQL Editor */}
+            <Paper sx={{ mb: 2 }}>
+              <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
+                <Button
+                  startIcon={<Code />}
+                  onClick={handleExecuteDemo}
+                  disabled={!demoQuery.trim() || isExecuting}
+                  variant="contained"
+                  size="small"
+                >
+                  Run Example
+                </Button>
+              </Box>
+              <SQLEditor
+                value={demoQuery}
+                onChange={setDemoQuery}
+                height="150px"
+                onExecute={handleExecuteDemo}
+                showResults={false}
+              />
+            </Paper>
+
+            {/* Results */}
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Results
+              </Typography>
+              {queryError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {queryError instanceof Error ? queryError.message : 'Query execution failed'}
+                </Alert>
+              )}
+              {queryResult && queryResult.length > 0 ? (
+                <DataTable data={queryResult[0]} maxRows={10} compact />
+              ) : (
+                <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
+                  Run an example query to see results
+                </Typography>
+              )}
+            </Paper>
           </CardContent>
         </TabPanel>
       </Card>

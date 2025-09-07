@@ -7,7 +7,7 @@ export const getTheme = (mode: PaletteMode) =>
     palette: {
       mode,
       primary: {
-        main: '#c81919',
+        main: '#c8102e',
         light: '#ff4444',
         dark: '#960000',
       },
@@ -62,7 +62,7 @@ export const getTheme = (mode: PaletteMode) =>
           root: { borderColor: mode === 'dark' ? '#3e4451' : '#e0e0e0' },
           head: {
             backgroundColor: mode === 'dark' ? '#282c34' : '#f5f5f5',
-            color: '#c81919',
+            color: '#c8102e',
             fontWeight: 'bold',
           },
           body: { color: mode === 'dark' ? '#eaecf1' : '#1a1a1a' },

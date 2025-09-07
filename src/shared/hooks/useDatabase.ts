@@ -1,9 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSQLJS } from '@/shared/providers/SQLJSProvider';
+import { useState, useCallback, useEffect } from 'react';
+import { useDatabaseContext, DatabaseContextType } from '@/shared/providers/DatabaseProvider';
+import { schemas, getSchemaForSkill } from '@/features/database/schemas';
 
 interface QueryResult {
   columns: string[];
   values: any[][];
+}
+
+interface DatabaseOptions {
+  context: DatabaseContextType;
+  schema?: keyof typeof schemas;
+  skillId?: string; // Alternative to schema - will auto-detect schema
+  resetOnSchemaChange?: boolean;
+  persistent?: boolean; // Only applies to playground context
 }
 
 interface UseDatabaseReturn {
@@ -18,78 +27,91 @@ interface UseDatabaseReturn {
   tableNames: string[];
 }
 
-export function useDatabase(schema?: string): UseDatabaseReturn {
-  const SQLJS = useSQLJS();
+export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
+  const { 
+    context, 
+    schema, 
+    skillId, 
+    resetOnSchemaChange = true,
+    persistent = false 
+  } = options;
+
+  const { getDatabase, resetDatabase: resetContextDatabase, isReady: contextReady } = useDatabaseContext();
   
-  const [db, setDb] = useState<any>(null);
+  const [currentSchema, setCurrentSchema] = useState<string>('');
+  const [database, setDatabase] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [queryResult, setQueryResult] = useState<QueryResult[] | null>(null);
   const [queryError, setQueryError] = useState<Error | null>(null);
   const [tableNames, setTableNames] = useState<string[]>([]);
-  
-  // Initialize database with schema
-  const initializeDatabase = useCallback(() => {
-    if (!SQLJS || !schema) return null;
-    
-    try {
-      const database = new SQLJS.Database();
-      database.run(schema);
-      return database;
-    } catch (err) {
-      console.error('Database initialization error:', err);
-      setError(err instanceof Error ? err.message : 'Database setup failed');
-      return null;
-    }
-  }, [SQLJS, schema]);
-  
-  // Set up database when SQLJS and schema are ready
+
+  // Determine which schema to use
+  const resolvedSchema = schema 
+    ? schemas[schema] 
+    : skillId 
+    ? schemas[getSchemaForSkill(skillId)]
+    : schemas.companies;
+
+  // Update database when schema changes or context is ready
   useEffect(() => {
-    if (SQLJS && schema) {
-      const database = initializeDatabase();
-      if (database) {
-        setDb(database);
-        setError(null);
-        
-        // Get table names
+    if (!contextReady || !resolvedSchema) return;
+
+    // Check if we need to reset due to schema change
+    const schemaChanged = currentSchema !== resolvedSchema;
+    const shouldReset = !persistent || (resetOnSchemaChange && schemaChanged);
+
+    if (shouldReset || !database) {
+      // Reset the context if schema changed (except for persistent playground)
+      if (schemaChanged && !(context === 'playground' && persistent)) {
+        resetContextDatabase(context);
+      }
+
+      const db = getDatabase(context, resolvedSchema);
+      setDatabase(db);
+      setCurrentSchema(resolvedSchema);
+      setError(null);
+
+      // Update table names
+      if (db) {
         try {
-          const tables = database.exec(
+          const tables = db.exec(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
           );
           if (tables[0]) {
             setTableNames(tables[0].values.map((row: any[]) => row[0]));
+          } else {
+            setTableNames([]);
           }
         } catch (err) {
           console.warn('Could not fetch table names:', err);
+          setTableNames([]);
         }
       }
     }
-  }, [SQLJS, schema, initializeDatabase]);
-  
-  // Cleanup database on unmount
-  useEffect(() => {
-    return () => {
-      if (db && typeof db.close === 'function') {
-        try {
-          db.close();
-        } catch (err) {
-          console.warn('Error closing database:', err);
-        }
-      }
-    };
-  }, [db]);
-  
+  }, [
+    contextReady, 
+    resolvedSchema, 
+    currentSchema, 
+    context, 
+    persistent, 
+    resetOnSchemaChange, 
+    getDatabase, 
+    resetContextDatabase,
+    database
+  ]);
+
   // Execute query function
   const executeQuery = useCallback(async (query: string): Promise<QueryResult[]> => {
-    if (!db) {
-      throw new Error('Database not ready');
+    if (!database) {
+      throw new Error(`Database not ready for ${context} context`);
     }
-    
+
     setIsExecuting(true);
     setQueryError(null);
-    
+
     try {
-      const result = db.exec(query);
+      const result = database.exec(query);
       setQueryResult(result);
       return result;
     } catch (err) {
@@ -99,48 +121,54 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
     } finally {
       setIsExecuting(false);
     }
-  }, [db]);
-  
-  // Reset database to initial state
+  }, [database, context]);
+
+  // Reset current database
   const resetDatabase = useCallback(() => {
-    if (db && typeof db.close === 'function') {
-      try {
-        db.close();
-      } catch (err) {
-        console.warn('Error closing old database:', err);
-      }
-    }
-    
-    const database = initializeDatabase();
-    if (database) {
-      setDb(database);
-      setQueryResult(null);
-      setQueryError(null);
-      setError(null);
-      
-      // Update table names
-      try {
-        const tables = database.exec(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
-        );
-        if (tables[0]) {
-          setTableNames(tables[0].values.map((row: any[]) => row[0]));
-        }
-      } catch (err) {
-        console.warn('Could not fetch table names after reset:', err);
-      }
-    }
-  }, [initializeDatabase]);
-  
-  return { 
-    database: db,
+    resetContextDatabase(context);
+    setQueryResult(null);
+    setQueryError(null);
+    setError(null);
+    // Database will be recreated in the next effect cycle
+  }, [context, resetContextDatabase]);
+
+  return {
+    database,
     executeQuery,
     resetDatabase,
-    isReady: !!db,
+    isReady: contextReady && !!database,
     isExecuting,
     error,
     queryResult,
     queryError,
-    tableNames
+    tableNames,
   };
+}
+
+// Convenience hooks for specific contexts
+export function usePlaygroundDatabase(schema: keyof typeof schemas = 'companiesAndPositions') {
+  return useDatabase({
+    context: 'playground',
+    schema,
+    persistent: true,
+    resetOnSchemaChange: false,
+  });
+}
+
+export function useExerciseDatabase(skillId: string) {
+  return useDatabase({
+    context: 'exercise',
+    skillId,
+    resetOnSchemaChange: true,
+    persistent: false,
+  });
+}
+
+export function useConceptDatabase(schema: keyof typeof schemas = 'companies') {
+  return useDatabase({
+    context: 'concept',
+    schema,
+    resetOnSchemaChange: true,
+    persistent: false,
+  });
 }

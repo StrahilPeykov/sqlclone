@@ -6,3 +6,9 @@ export {
   useSQLJSError,
   useSQLJSContext
 } from './SQLJSProvider';
+
+export {
+  DatabaseProvider,
+  useDatabaseContext,
+  type DatabaseContextType
+} from './DatabaseProvider';
