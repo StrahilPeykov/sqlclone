@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSQLJS } from '@/shared/providers/SQLJSProvider';
 import { useAppStore } from '@/store';
-import { useDatabaseCleanup } from '@/shared/hooks/useDatabaseCleanup';
 
 interface QueryResult {
   columns: string[];
@@ -23,8 +22,6 @@ interface UseDatabaseReturn {
 export function useDatabase(schema?: string): UseDatabaseReturn {
   const SQLJS = useSQLJS();
   const getSharedDatabase = useAppStore(state => state.getDatabase);
-  const { cleanupDatabase } = useDatabaseCleanup();
-  
   const [db, setDb] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -81,9 +78,6 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
   const resetDatabase = useCallback(() => {
     if (SQLJS && schema) {
       try {
-        // Clear the specific database from shared cache and recreate
-        cleanupDatabase(schema);
-
         // Create new database instance
         const database = getSharedDatabase(schema, SQLJS);
         setDb(database);
@@ -103,14 +97,7 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
       }
     }
   }, [SQLJS, schema, getSharedDatabase]);
-
-  // Cleanup on unmount or when schema changes
-  useEffect(() => {
-    if (!schema) return;
-    return () => {
-      cleanupDatabase(schema);
-    };
-  }, [schema, cleanupDatabase]);
+  
   
   return { 
     database: db,
