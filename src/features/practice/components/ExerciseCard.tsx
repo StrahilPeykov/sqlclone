@@ -42,10 +42,10 @@ export function ExerciseCard({ exercise, onComplete }: ExerciseCardProps) {
     message: string;
   } | null>(null);
   
-  const { executeQuery, queryResult, queryError, isExecuting } = useDatabase({
-    name: exercise.database,
-    schema: exercise.schema,
-  });
+  // Initialize database with provided schema
+  const { executeQuery, queryResult, queryError, isExecuting } = useDatabase(
+    exercise.schema
+  );
   
   const handleSubmit = async () => {
     setAttempts((prev) => prev + 1);

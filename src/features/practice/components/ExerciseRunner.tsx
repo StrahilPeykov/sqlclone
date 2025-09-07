@@ -20,6 +20,7 @@ import {
 
 import { SQLEditor } from '@/shared/components/SQLEditor/SQLEditor';
 import { useDatabase } from '@/features/database/hooks/useDatabase';
+import { schemas } from '@/features/database/schemas';
 
 interface Exercise {
   id: string;
@@ -49,10 +50,10 @@ export function ExerciseRunner({ exercise, onComplete, onNext }: ExerciseRunnerP
   const [showHint, setShowHint] = useState(false);
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
 
-  const { executeQuery, isLoading: isDbLoading } = useDatabase(
-    exercise.database || 'default',
-    exercise.schema
+  const { executeQuery, isReady } = useDatabase(
+    exercise.schema ?? schemas.companies
   );
+  const isDbLoading = !isReady;
 
   const handleSubmit = useCallback(async () => {
     if (!query.trim()) {

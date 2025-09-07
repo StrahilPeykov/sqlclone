@@ -4,161 +4,125 @@
     "name": "What is a Database?",
     "type": "concept",
     "description": "Understanding databases, tables, and database management systems",
-    "prerequisites": [],
-    "estimatedTime": 15,
-    "difficulty": "beginner"
+    "prerequisites": []
   },
   {
     "id": "database-table",
     "name": "Database Tables",
     "type": "concept",
     "description": "Learn about rows, columns, and how data is structured in tables",
-    "prerequisites": ["database"],
-    "estimatedTime": 20,
-    "difficulty": "beginner"
+    "prerequisites": ["database"]
   },
   {
     "id": "data-types",
     "name": "Data Types",
     "type": "concept",
     "description": "Different types of data that can be stored in database columns",
-    "prerequisites": ["database-table"],
-    "estimatedTime": 25,
-    "difficulty": "beginner"
+    "prerequisites": ["database-table"]
   },
   {
     "id": "database-keys",
     "name": "Database Keys",
     "type": "concept",
     "description": "Primary keys, foreign keys, and unique identifiers",
-    "prerequisites": ["database-table"],
-    "estimatedTime": 30,
-    "difficulty": "intermediate"
+    "prerequisites": ["database-table"]
   },
   {
     "id": "query-language",
     "name": "Query Languages",
     "type": "concept",
     "description": "How to communicate with databases using query languages",
-    "prerequisites": ["database"],
-    "estimatedTime": 15,
-    "difficulty": "beginner"
+    "prerequisites": ["database"]
   },
   {
     "id": "sql",
     "name": "Introduction to SQL",
     "type": "concept",
     "description": "Structured Query Language basics and syntax",
-    "prerequisites": ["query-language"],
-    "estimatedTime": 20,
-    "difficulty": "beginner"
+    "prerequisites": ["query-language"]
   },
   {
     "id": "filter-rows",
     "name": "Filter Rows",
     "type": "skill",
     "description": "Use WHERE clause to filter data based on conditions",
-    "prerequisites": ["sql", "data-types"],
-    "estimatedTime": 30,
-    "difficulty": "beginner"
+    "prerequisites": ["sql", "data-types"]
   },
   {
     "id": "filter-rows-multiple",
     "name": "Filter Rows on Multiple Criteria",
     "type": "skill",
     "description": "Combine multiple conditions with AND, OR, and NOT",
-    "prerequisites": ["filter-rows"],
-    "estimatedTime": 35,
-    "difficulty": "intermediate"
+    "prerequisites": ["filter-rows"]
   },
   {
     "id": "choose-columns",
     "name": "Choose Columns",
     "type": "skill",
     "description": "Select specific columns and rename them with aliases",
-    "prerequisites": ["sql"],
-    "estimatedTime": 20,
-    "difficulty": "beginner"
+    "prerequisites": ["sql"]
   },
   {
     "id": "process-columns",
     "name": "Create Processed Columns",
     "type": "skill",
     "description": "Use arithmetic and functions to create calculated columns",
-    "prerequisites": ["choose-columns", "data-types"],
-    "estimatedTime": 40,
-    "difficulty": "intermediate"
+    "prerequisites": ["choose-columns", "data-types"]
   },
   {
     "id": "sort-rows",
     "name": "Sort Rows",
     "type": "skill",
     "description": "Order results using ORDER BY and limit with LIMIT",
-    "prerequisites": ["sql", "data-types"],
-    "estimatedTime": 25,
-    "difficulty": "beginner"
+    "prerequisites": ["sql", "data-types"]
   },
   {
     "id": "single-criterion-query",
     "name": "Write Single-Criterion Query",
     "type": "skill",
     "description": "Combine projection and simple filtering",
-    "prerequisites": ["choose-columns", "filter-rows"],
-    "estimatedTime": 30,
-    "difficulty": "beginner"
+    "prerequisites": ["choose-columns", "filter-rows"]
   },
   {
     "id": "multi-criterion-query",
     "name": "Write Multi-Criterion Query",
     "type": "skill",
     "description": "Complex queries with multiple filters, calculations, and sorting",
-    "prerequisites": ["process-columns", "filter-rows-multiple", "sort-rows"],
-    "estimatedTime": 45,
-    "difficulty": "intermediate"
+    "prerequisites": ["process-columns", "filter-rows-multiple", "sort-rows"]
   },
   {
     "id": "join-tables",
     "name": "Join Tables",
     "type": "skill",
     "description": "Combine data from multiple tables using JOIN",
-    "prerequisites": ["database-keys", "choose-columns", "filter-rows-multiple"],
-    "estimatedTime": 50,
-    "difficulty": "intermediate"
+    "prerequisites": ["database-keys", "choose-columns", "filter-rows-multiple"]
   },
   {
     "id": "aggregate-columns",
     "name": "Aggregate Columns",
     "type": "skill",
     "description": "Use SUM, COUNT, AVG, MIN, MAX with GROUP BY",
-    "prerequisites": ["choose-columns"],
-    "estimatedTime": 40,
-    "difficulty": "intermediate"
+    "prerequisites": ["choose-columns"]
   },
   {
     "id": "multi-table-query",
     "name": "Write Multi-Table Query",
     "type": "skill",
     "description": "Complex queries spanning multiple tables with joins and subqueries",
-    "prerequisites": ["join-tables", "single-criterion-query"],
-    "estimatedTime": 60,
-    "difficulty": "advanced"
+    "prerequisites": ["join-tables", "single-criterion-query"]
   },
   {
     "id": "filtered-aggregation",
     "name": "Use Filtered Aggregation",
     "type": "skill",
     "description": "Apply WHERE and HAVING clauses with aggregation",
-    "prerequisites": ["aggregate-columns", "filter-rows-multiple", "process-columns"],
-    "estimatedTime": 45,
-    "difficulty": "advanced"
+    "prerequisites": ["aggregate-columns", "filter-rows-multiple", "process-columns"]
   },
   {
     "id": "multi-layered-query",
     "name": "Write Multi-Layered Query",
     "type": "skill",
     "description": "CTEs, subqueries, and complex nested queries",
-    "prerequisites": ["filtered-aggregation", "multi-criterion-query", "multi-table-query"],
-    "estimatedTime": 75,
-    "difficulty": "advanced"
+    "prerequisites": ["filtered-aggregation", "multi-criterion-query", "multi-table-query"]
   }
 ]

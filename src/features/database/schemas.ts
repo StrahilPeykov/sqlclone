@@ -1,6 +1,3 @@
-// Database schema definitions for exercises and playground
-import { DatabaseConfig } from './DatabaseService';
-
 export const schemas = {
   companies: `
     CREATE TABLE companies (
@@ -47,6 +44,91 @@ export const schemas = {
       FOREIGN KEY (company_id) REFERENCES companies(id)
     );
     
+    INSERT INTO positions VALUES
+      (1, 1, 'LinkedIn', 'United States', 'San Francisco', 'ML Engineer', 'Engineering', 140000, 1),
+      (2, 1, 'LinkedIn', 'United States', 'New York', 'ML Engineer', 'Engineering', 100000, 1),
+      (3, 1, 'LinkedIn', 'United States', 'Sunnyvale', 'Data Engineer', 'Data', 110000, 0),
+      (4, 2, 'Meta', 'United States', 'New York', 'Data Analyst', 'Analytics', 130000, 1),
+      (5, 2, 'Meta', 'United States', 'San Francisco', 'Data Engineer', 'Data', 130000, 1),
+      (6, 2, 'Meta', 'United Kingdom', 'London', 'Data Engineer', 'Data', 130000, 0),
+      (7, 3, 'ING', 'Netherlands', 'Amsterdam', 'Data Engineer', 'Data', 80000, 0),
+      (8, 3, 'ING', 'Netherlands', 'Amsterdam', 'Data Analyst', 'Analytics', 80000, 0),
+      (9, 3, 'ING', 'Netherlands', 'Amsterdam', 'Data Scientist', 'Data Science', 82000, 1),
+      (10, 4, 'KPMG', 'Netherlands', 'Amsterdam', 'Data Engineer', 'Data', 87000, 1),
+      (11, 4, 'KPMG', 'Netherlands', 'Rotterdam', 'Data Analyst', 'Analytics', 80000, 0),
+      (12, 4, 'KPMG', 'Netherlands', 'Amsterdam', 'Data Scientist', 'Data Science', 80000, 1),
+      (13, 5, 'PwC', 'Netherlands', 'Amsterdam', 'Data Engineer', 'Data', 83000, 1),
+      (14, 5, 'PwC', 'Netherlands', 'Amsterdam', 'Data Analyst', 'Analytics', 80000, 0),
+      (15, 6, 'Deloitte', 'Netherlands', 'Amsterdam', 'Data Engineer', 'Data', 95000, 1),
+      (16, 6, 'Deloitte', 'Netherlands', 'Amsterdam', 'AI Consultant', 'Consulting', 90000, 1),
+      (17, 6, 'Deloitte', 'Netherlands', 'Amsterdam', 'Data Scientist', 'Data Science', 95000, 0),
+      (18, 7, 'EY', 'Netherlands', 'Amsterdam', 'Data Engineer', 'Data', 85000, 1),
+      (19, 7, 'EY', 'Netherlands', 'Rotterdam', 'Data Scientist', 'Data Science', 84000, 0),
+      (20, 8, 'TikTok', 'United States', 'Los Angeles', 'Data Engineer', 'Data', 125000, 0),
+      (21, 8, 'TikTok', 'United States', 'New York', 'ML Engineer', 'Engineering', 120000, 1),
+      (22, 8, 'TikTok', 'United States', 'Los Angeles', 'Data Scientist', 'Data Science', 122000, 0),
+      (23, 9, 'Twitter', 'United States', 'San Francisco', 'Data Engineer', 'Data', 130000, 1),
+      (24, 9, 'Twitter', 'United States', 'New York', 'Data Analyst', 'Analytics', 120000, 1),
+      (25, 9, 'Twitter', 'United States', 'San Francisco', 'Data Scientist', 'Data Science', 125000, 1),
+      (26, 10, 'Google', 'United States', 'Mountain View', 'Data Engineer', 'Data', 140000, 0),
+      (27, 10, 'Google', 'United States', 'New York', 'Data Analyst', 'Analytics', 130000, 1),
+      (28, 10, 'Google', 'United States', 'Mountain View', 'Data Scientist', 'Data Science', 135000, 0),
+      (29, 11, 'Apple', 'United States', 'Cupertino', 'Data Engineer', 'Data', 145000, 0),
+      (30, 11, 'Apple', 'United States', 'New York', 'Data Analyst', 'Analytics', 135000, 0),
+      (31, 11, 'Apple', 'United States', 'Cupertino', 'Data Scientist', 'Data Science', 140000, 0),
+      (32, 12, 'Microsoft', 'United States', 'Redmond', 'Data Engineer', 'Data', 150000, 1),
+      (33, 12, 'Microsoft', 'United States', 'New York', 'Data Analyst', 'Analytics', 140000, 1),
+      (34, 12, 'Microsoft', 'United States', 'Redmond', 'Data Scientist', 'Data Science', 145000, 1),
+      (35, 13, 'Rabobank', 'Netherlands', 'Utrecht', 'Data Engineer', 'Data', 80000, 0),
+      (36, 13, 'Rabobank', 'Netherlands', 'Amsterdam', 'Data Analyst', 'Analytics', 80000, 1);
+  `,
+  
+  // Combination schemas for different skill levels
+  companiesAndPositions: `
+    CREATE TABLE companies (
+      id INTEGER PRIMARY KEY,
+      company_name TEXT NOT NULL,
+      country TEXT NOT NULL,
+      founded_year INTEGER,
+      num_employees INTEGER,
+      industry TEXT
+    );
+    
+    CREATE TABLE positions (
+      id INTEGER PRIMARY KEY,
+      company_id INTEGER,
+      company_name TEXT,
+      country TEXT,
+      city TEXT,
+      position TEXT,
+      department TEXT,
+      salary INTEGER,
+      remote_allowed BOOLEAN,
+      FOREIGN KEY (company_id) REFERENCES companies(id)
+    );
+    
+    -- Insert companies data
+    INSERT INTO companies VALUES 
+      (1, 'LinkedIn', 'United States', 2003, 20000, 'Social Media'),
+      (2, 'Meta', 'United States', 2004, 77000, 'Social Media'),
+      (3, 'ING', 'Netherlands', 1991, 57000, 'Banking'),
+      (4, 'KPMG', 'Netherlands', 1987, 236000, 'Consulting'),
+      (5, 'PwC', 'Netherlands', 1998, 328000, 'Consulting'),
+      (6, 'Deloitte', 'Netherlands', 1845, 415000, 'Consulting'),
+      (7, 'EY', 'Netherlands', 1989, 365000, 'Consulting'),
+      (8, 'TikTok', 'United States', 2016, 150000, 'Social Media'),
+      (9, 'Twitter', 'United States', 2006, 7500, 'Social Media'),
+      (10, 'Google', 'United States', 1998, 190000, 'Technology'),
+      (11, 'Apple', 'United States', 1976, 164000, 'Technology'),
+      (12, 'Microsoft', 'United States', 1975, 221000, 'Technology'),
+      (13, 'Rabobank', 'Netherlands', 1972, 43000, 'Banking'),
+      (14, 'ASML', 'Netherlands', 1984, 40000, 'Technology'),
+      (15, 'Philips', 'Netherlands', 1891, 78000, 'Healthcare'),
+      (16, 'NXP', 'Netherlands', 2006, 34000, 'Semiconductors'),
+      (17, 'Unilever', 'United Kingdom', 1929, 128000, 'Consumer Goods'),
+      (18, 'Shell', 'Netherlands', 1907, 86000, 'Energy');
+    
+    -- Insert positions data
     INSERT INTO positions VALUES
       (1, 1, 'LinkedIn', 'United States', 'San Francisco', 'ML Engineer', 'Engineering', 140000, 1),
       (2, 1, 'LinkedIn', 'United States', 'New York', 'ML Engineer', 'Engineering', 100000, 1),
@@ -150,86 +232,40 @@ export const schemas = {
       (8, 5, 'Analyst', 600),
       (9, 4, 'ML Lead', 500);
   `,
-  
-  sales: `
-    CREATE TABLE customers (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE,
-      country TEXT,
-      signup_date DATE,
-      tier TEXT CHECK(tier IN ('Free', 'Basic', 'Premium', 'Enterprise'))
-    );
-    
-    CREATE TABLE products (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      category TEXT,
-      price DECIMAL(10, 2),
-      stock_quantity INTEGER,
-      discontinued BOOLEAN DEFAULT 0
-    );
-    
-    CREATE TABLE orders (
-      id INTEGER PRIMARY KEY,
-      customer_id INTEGER,
-      order_date DATE,
-      total_amount DECIMAL(10, 2),
-      status TEXT CHECK(status IN ('Pending', 'Shipped', 'Delivered', 'Cancelled')),
-      FOREIGN KEY (customer_id) REFERENCES customers(id)
-    );
-    
-    CREATE TABLE order_items (
-      order_id INTEGER,
-      product_id INTEGER,
-      quantity INTEGER,
-      unit_price DECIMAL(10, 2),
-      discount DECIMAL(5, 2) DEFAULT 0,
-      PRIMARY KEY (order_id, product_id),
-      FOREIGN KEY (order_id) REFERENCES orders(id),
-      FOREIGN KEY (product_id) REFERENCES products(id)
-    );
-    
-    -- Sample data would go here
-  `,
 };
 
-// Helper function to get combined schemas for complex exercises
-export function getCombinedSchema(...schemaNames: (keyof typeof schemas)[]): string {
-  return schemaNames.map(name => schemas[name]).join('\n\n');
+// Helper function to get schema by skill ID
+export function getSchemaForSkill(skillId: string): string {
+  const schemaMap: Record<string, string> = {
+    // Basic skills - single table
+    'filter-rows': schemas.companies,
+    'choose-columns': schemas.companies,
+    'sort-rows': schemas.companies,
+    'process-columns': schemas.positions,
+    
+    // Intermediate skills - two tables
+    'filter-rows-multiple': schemas.companiesAndPositions,
+    'join-tables': schemas.companiesAndPositions,
+    'aggregate-columns': schemas.positions,
+    'single-criterion-query': schemas.companies,
+    'multi-criterion-query': schemas.companiesAndPositions,
+    
+    // Advanced skills - complex schemas
+    'multi-table-query': schemas.companiesAndPositions,
+    'filtered-aggregation': schemas.companiesAndPositions,
+    'multi-layered-query': schemas.employees,
+    
+    // Default
+    default: schemas.companies,
+  };
+  
+  return schemaMap[skillId] || schemaMap.default;
 }
 
-// Pre-defined database configurations for different exercise types
-export const databaseConfigs: Record<string, DatabaseConfig> = {
-  basic: {
-    name: 'basic',
-    schema: schemas.companies,
-  },
-  intermediate: {
-    name: 'intermediate', 
-    schema: getCombinedSchema('companies', 'positions'),
-  },
-  advanced: {
-    name: 'advanced',
-    schema: getCombinedSchema('employees'),
-  },
-  fullPlayground: {
-    name: 'playground',
-    schema: getCombinedSchema('companies', 'positions', 'employees', 'sales'),
-  },
-};
-
-// Skill-specific database configurations
-export const skillDatabaseConfigs: Record<string, DatabaseConfig> = {
-  'filter-rows': databaseConfigs.basic,
-  'choose-columns': databaseConfigs.basic,
-  'sort-rows': databaseConfigs.basic,
-  'join-tables': databaseConfigs.intermediate,
-  'aggregate-columns': databaseConfigs.intermediate,
-  'multi-table-query': databaseConfigs.advanced,
-};
-
-// Helper function to get database config for a skill
-export function getDatabaseConfigForSkill(skillId: string): DatabaseConfig {
-  return skillDatabaseConfigs[skillId] || databaseConfigs.basic;
+// Get all available table names for a schema
+export function getTableNames(schema: string): string[] {
+  const matches = schema.match(/CREATE TABLE (\w+)/g);
+  if (!matches) return [];
+  
+  return matches.map(match => match.replace('CREATE TABLE ', ''));
 }

@@ -7,8 +7,6 @@ export const ComponentMetaSchema = z.object({
   type: z.enum(['concept', 'skill']),
   description: z.string().optional(),
   prerequisites: z.array(z.string()).default([]),
-  estimatedTime: z.number().optional(), // in minutes
-  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
 });
 
 export const ConceptContentSchema = z.object({
@@ -25,7 +23,6 @@ export const ConceptContentSchema = z.object({
 export const ExerciseSchema = z.object({
   id: z.string(),
   version: z.number(),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
   points: z.number().default(10),
   
   // Exercise configuration
@@ -88,5 +85,4 @@ export interface LearningPath {
   name: string;
   description: string;
   components: string[]; // Ordered list of component IDs
-  estimatedTime: number; // Total time in minutes
 }

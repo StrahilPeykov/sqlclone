@@ -9,8 +9,6 @@ export interface ContentEntryMeta {
   type: ContentType;
   description: string;
   prerequisites: string[];
-  estimatedTime?: number;
-  difficulty?: string;
 }
 
 const cache: Record<string, any> = {};

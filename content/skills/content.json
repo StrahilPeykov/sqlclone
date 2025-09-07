@@ -47,7 +47,6 @@
     {
       "id": "filter-by-country",
       "version": 1,
-      "difficulty": "easy",
       "points": 10,
       "config": {
         "database": "companies",
@@ -58,7 +57,7 @@
           "Don't forget quotes around string values"
         ]
       },
-      "generator": "function generate(utils) {\n  const countries = ['Netherlands', 'United States', 'United Kingdom', 'Germany', 'France'];\n  const country = utils.selectRandomly(countries);\n  return {\n    targetCountry: country,\n    description: `Find all companies from ${country}`,\n    expectedQuery: `SELECT * FROM companies WHERE country = '${country}'`\n  };\n}",
+      "generator": "function generate(utils) {\n  const countries = ['Netherlands', 'United States', 'United Kingdom'];\n  const country = utils.selectRandomly(countries);\n  return {\n    targetCountry: country,\n    description: `Find all companies from ${country}`,\n    expectedQuery: `SELECT * FROM companies WHERE country = '${country}'`\n  };\n}",
       "validator": "function validate(input, state, result) {\n  if (!result || result.length === 0) return false;\n  const expectedCountries = result[0].values.every(row => row[2] === state.targetCountry);\n  return expectedCountries;\n}",
       "solutionTemplate": "SELECT * FROM companies\nWHERE country = '{{targetCountry}}';"
     },
@@ -66,7 +65,6 @@
     {
       "id": "filter-by-salary",
       "version": 1,
-      "difficulty": "medium",
       "points": 15,
       "config": {
         "database": "positions",
@@ -77,14 +75,13 @@
         ]
       },
       "generator": "function generate(utils) {\n  const minSalary = utils.generateRandomNumber(80000, 120000);\n  return {\n    minSalary: minSalary,\n    description: `Find all positions with salary greater than $${minSalary.toLocaleString()}`,\n    expectedQuery: `SELECT * FROM positions WHERE salary > ${minSalary}`\n  };\n}",
-      "validator": "function validate(input, state, result) {\n  if (!result || result.length === 0) return false;\n  return result[0].values.every(row => row[5] > state.minSalary);\n}",
+      "validator": "function validate(input, state, result) {\n  if (!result || result.length === 0) return false;\n  // positions schema: id(0), company_id(1), company_name(2), country(3), city(4), position(5), department(6), salary(7), remote_allowed(8)\n  return result[0].values.every(row => row[7] > state.minSalary);\n}",
       "solutionTemplate": "SELECT * FROM positions\nWHERE salary > {{minSalary}};"
     },
     
     {
       "id": "filter-with-pattern",
       "version": 1,
-      "difficulty": "medium",
       "points": 20,
       "config": {
         "database": "companies",

@@ -52,8 +52,6 @@ export interface ComponentMeta {
   type: 'concept' | 'skill';
   description: string;
   prerequisites: string[];
-  estimatedTime?: number; // in minutes
-  difficulty?: 'beginner' | 'intermediate' | 'advanced';
   tags?: string[];
   category?: string;
   order?: number;
@@ -91,7 +89,6 @@ export interface SkillContent {
 export interface Exercise {
   id: string;
   version: number;
-  difficulty: 'easy' | 'medium' | 'hard';
   points: number;
   
   // Exercise configuration
@@ -160,7 +157,6 @@ export interface LearningPath {
   name: string;
   description: string;
   components: string[]; // Ordered list of component IDs
-  estimatedTime: number; // Total time in minutes
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   tags?: string[];
 }

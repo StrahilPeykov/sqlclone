@@ -1,21 +1,11 @@
-export { 
-  LocalStorageManager, 
-  useLocalStorageContext,
-  useLocalStorageState, 
-  useLocalStorageValue,
-  useIsLocalStorageInitialized 
-} from './LocalStorageManager';
-
+// Only export what we're keeping - SQLJSProvider
 export { 
   SQLJSProvider, 
-  useSQLJSContext,
   useSQLJS, 
   useSQLJSReady,
-  useSQLJSError 
+  useSQLJSError,
+  useSQLJSContext
 } from './SQLJSProvider';
 
-export { 
-  SkillDatabaseProvider, 
-  useSkillDatabaseContext,
-  useSkillDatabase 
-} from './SkillDatabaseProvider';
+// Note: LocalStorageManager and SkillDatabaseProvider have been removed
+// Their functionality is now handled by the Zustand store in src/store/index.ts

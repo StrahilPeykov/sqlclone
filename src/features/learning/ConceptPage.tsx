@@ -21,8 +21,7 @@ import {
   MenuBook,
 } from '@mui/icons-material';
 
-import { useAppStore } from '@/store';
-import { useComponentMeta, useConceptContent } from '@/features/content/ContentService';
+import { useComponentState } from '@/store';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -50,23 +49,64 @@ export default function ConceptPage() {
   const { conceptId } = useParams<{ conceptId: string }>();
   const navigate = useNavigate();
   const [currentTab, setCurrentTab] = useState(0);
-  const updateProgress = useAppStore((state) => state.updateProgress);
-  const user = useAppStore((state) => state.user);
-
-  // Load content using the new service
-  const { data: conceptMeta, isLoading: metaLoading, error: metaError } = useComponentMeta(conceptId || '');
-  const { data: conceptContent, isLoading: contentLoading, error: contentError } = useConceptContent(conceptId || '');
+  
+  // Use new store
+  const [componentState, setComponentState] = useComponentState(conceptId || '');
+  
+  // Load concept metadata
+  const [conceptMeta, setConceptMeta] = useState<any>(null);
+  const [conceptContent, setConceptContent] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (conceptId) {
-      updateProgress(conceptId, { 
-        lastAccessed: new Date(),
-        type: 'concept'
+    if (!conceptId) return;
+    
+    // Load metadata from index
+    fetch('/content/index.json')
+      .then(res => res.json())
+      .then(data => {
+        const concept = data.find((c: any) => c.id === conceptId);
+        if (concept) {
+          setConceptMeta(concept);
+          
+          // Try to load concept content
+          return fetch(`/content/concepts/${conceptId}.json`);
+        }
+        throw new Error('Concept not found');
+      })
+      .then(res => res.json())
+      .then(content => {
+        setConceptContent(content);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load concept:', err);
+        setError(err.message);
+        setIsLoading(false);
       });
+      
+    // Update last accessed
+    if (componentState.type !== 'concept') {
+      setComponentState({ type: 'concept' });
     }
-  }, [conceptId, updateProgress]);
+  }, [conceptId, setComponentState, componentState.type]);
 
-  if (metaLoading) {
+  // Restore saved tab
+  useEffect(() => {
+    if (componentState.tab) {
+      const tabIndex = ['theory', 'summary'].indexOf(componentState.tab);
+      if (tabIndex >= 0) setCurrentTab(tabIndex);
+    }
+  }, [componentState.tab]);
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+    const tabNames = ['theory', 'summary'];
+    setComponentState({ tab: tabNames[newValue] });
+  };
+
+  if (isLoading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
         <CircularProgress />
@@ -74,27 +114,26 @@ export default function ConceptPage() {
     );
   }
 
-  if (metaError || !conceptMeta) {
+  if (error || !conceptMeta) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error">
-          Concept not found. <Button onClick={() => navigate('/learn')}>Return to learning</Button>
+          {error || 'Concept not found'}
+          <Button onClick={() => navigate('/learn')}>Return to learning</Button>
         </Alert>
       </Container>
     );
   }
 
-  const isCompleted = user?.progress[conceptId!]?.completed || false;
+  const isCompleted = componentState.understood || false;
 
   const handleComplete = () => {
-    updateProgress(conceptId!, {
-      completed: true,
-      type: 'concept',
-    });
+    setComponentState({ understood: true });
   };
 
   const formatContent = (content: string) => {
-    // Simple markdown-like formatting
+    if (!content) return null;
+    
     const lines = content.trim().split('\n');
     return lines.map((line, index) => {
       if (line.startsWith('## ')) {
@@ -137,11 +176,7 @@ export default function ConceptPage() {
         <Typography variant="body1" color="text.secondary">
           {conceptMeta.description}
         </Typography>
-        {conceptMeta.estimatedTime && (
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Estimated time: {conceptMeta.estimatedTime} minutes
-          </Typography>
-        )}
+        {/* Estimated time removed */}
       </Box>
 
       {/* Prerequisites */}
@@ -154,7 +189,7 @@ export default function ConceptPage() {
       {/* Content Tabs */}
       <Card>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={currentTab} onChange={(_, newValue) => setCurrentTab(newValue)}>
+          <Tabs value={currentTab} onChange={handleTabChange}>
             <Tab label="Theory" icon={<Lightbulb />} iconPosition="start" />
             <Tab label="Summary" icon={<MenuBook />} iconPosition="start" />
           </Tabs>
@@ -163,16 +198,10 @@ export default function ConceptPage() {
         <TabPanel value={currentTab} index={0}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Theory</Typography>
-            {contentLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : contentError ? (
-              <Alert severity="error">Failed to load theory content</Alert>
-            ) : conceptContent?.theory ? (
+            {conceptContent?.theory ? (
               formatContent(conceptContent.theory)
             ) : (
-              <Typography variant="body1" color="text.secondary">Theory coming soon.</Typography>
+              <Typography variant="body1" color="text.secondary">Theory content coming soon.</Typography>
             )}
           </CardContent>
         </TabPanel>
@@ -180,13 +209,7 @@ export default function ConceptPage() {
         <TabPanel value={currentTab} index={1}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Summary</Typography>
-            {contentLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : contentError ? (
-              <Alert severity="error">Failed to load summary content</Alert>
-            ) : conceptContent?.summary ? (
+            {conceptContent?.summary ? (
               formatContent(conceptContent.summary)
             ) : (
               <Typography variant="body1" color="text.secondary">Summary coming soon.</Typography>
@@ -209,7 +232,7 @@ export default function ConceptPage() {
 
       {/* Action Buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-        <div /> {/* Spacer */}
+        <div />
         
         <Box sx={{ display: 'flex', gap: 2 }}>
           {!isCompleted && (
@@ -222,18 +245,15 @@ export default function ConceptPage() {
             </Button>
           )}
           
-          {(() => {
-            const nextId = conceptContent?.nextConcepts?.[0];
-            return nextId ? (
-              <Button
-                variant="outlined"
-                endIcon={<ArrowForward />}
-                onClick={() => navigate(`/concept/${nextId}`)}
-              >
-                Next
-              </Button>
-            ) : null;
-          })()}
+          {conceptContent?.nextConcepts?.[0] && (
+            <Button
+              variant="outlined"
+              endIcon={<ArrowForward />}
+              onClick={() => navigate(`/concept/${conceptContent.nextConcepts[0]}`)}
+            >
+              Next Concept
+            </Button>
+          )}
         </Box>
       </Box>
     </Container>

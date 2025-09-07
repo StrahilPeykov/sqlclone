@@ -12,9 +12,6 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  IconButton,
-  Tooltip,
-  Snackbar,
   Container,
 } from '@mui/material';
 import {
@@ -23,13 +20,13 @@ import {
   ContentCopy,
   Clear,
   Download,
-  Info,
+  Refresh,
 } from '@mui/icons-material';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
-import { useDatabase } from '@/features/database/hooks/useDatabase';
-import { databaseConfigs } from '@/features/database/schemas';
-import { useLocalStorage } from '@/shared/hooks';
+import { useDatabase } from '@/shared/hooks/useDatabase';
+import { schemas } from '@/features/database/schemas';
+import { useAppStore } from '@/store';
 
 interface QueryHistory {
   query: string;
@@ -39,25 +36,30 @@ interface QueryHistory {
 }
 
 export default function PlaygroundPage() {
-  const [selectedDatabase, setSelectedDatabase] = useState<keyof typeof databaseConfigs>('intermediate');
+  const [selectedSchema, setSelectedSchema] = useState<keyof typeof schemas>('companies');
   const [query, setQuery] = useState('SELECT * FROM companies LIMIT 10;');
   const [currentTab, setCurrentTab] = useState(0);
-  const [history, setHistory] = useLocalStorage<QueryHistory[]>('sql-playground-history', []);
-  const [savedQueries, setSavedQueries] = useLocalStorage<{ name: string; query: string }[]>('sql-playground-queries', []);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
-    open: false,
-    message: '',
-    severity: 'info',
-  });
+  const [message, setMessage] = useState<string | null>(null);
   
+  // Get saved queries from store
+  const savedQueries = useAppStore(state => state.components.playground?.savedQueries || []);
+  const updatePlayground = useAppStore(state => state.updateComponent);
+  
+  // Use simplified database hook
   const {
     executeQuery,
     queryResult,
     queryError,
-    isLoading: isExecuting,
+    isExecuting,
     tableNames,
     resetDatabase,
-  } = useDatabase(databaseConfigs[selectedDatabase]);
+    isReady
+  } = useDatabase(schemas[selectedSchema]);
+  
+  // Get history from store
+  const history: QueryHistory[] = useAppStore(state => 
+    state.components.playground?.history || []
+  );
   
   const handleExecute = async () => {
     try {
@@ -71,13 +73,11 @@ export default function PlaygroundPage() {
         rowCount: result?.[0]?.values?.length || 0,
       };
       
-      setHistory((prev) => [newHistoryEntry, ...prev.slice(0, 49)]); // Keep last 50 queries
-      
-      setSnackbar({
-        open: true,
-        message: `Query executed successfully (${result?.[0]?.values?.length || 0} rows)`,
-        severity: 'success',
+      updatePlayground('playground', {
+        history: [newHistoryEntry, ...history.slice(0, 49)]
       });
+      
+      setMessage(`Query executed successfully (${result?.[0]?.values?.length || 0} rows)`);
     } catch (error) {
       const newHistoryEntry: QueryHistory = {
         query,
@@ -85,13 +85,11 @@ export default function PlaygroundPage() {
         success: false,
       };
       
-      setHistory((prev) => [newHistoryEntry, ...prev.slice(0, 49)]);
-      
-      setSnackbar({
-        open: true,
-        message: `Query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        severity: 'error',
+      updatePlayground('playground', {
+        history: [newHistoryEntry, ...history.slice(0, 49)]
       });
+      
+      setMessage(`Query failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
@@ -99,39 +97,22 @@ export default function PlaygroundPage() {
     const name = prompt('Enter a name for this query:');
     if (name) {
       const newSavedQueries = [...savedQueries, { name, query }];
-      setSavedQueries(newSavedQueries);
-      
-      setSnackbar({
-        open: true,
-        message: 'Query saved successfully',
-        severity: 'success',
-      });
+      updatePlayground('playground', { savedQueries: newSavedQueries });
+      setMessage('Query saved successfully');
     }
   };
   
   const handleLoadQuery = (savedQuery: { name: string; query: string }) => {
     setQuery(savedQuery.query);
-    setSnackbar({
-      open: true,
-      message: `Loaded: ${savedQuery.name}`,
-      severity: 'info',
-    });
+    setMessage(`Loaded: ${savedQuery.name}`);
   };
   
   const handleCopyQuery = async () => {
     try {
       await navigator.clipboard.writeText(query);
-      setSnackbar({
-        open: true,
-        message: 'Query copied to clipboard',
-        severity: 'info',
-      });
+      setMessage('Query copied to clipboard');
     } catch (error) {
-      setSnackbar({
-        open: true,
-        message: 'Failed to copy query',
-        severity: 'error',
-      });
+      setMessage('Failed to copy query');
     }
   };
   
@@ -156,40 +137,25 @@ export default function PlaygroundPage() {
     a.click();
     URL.revokeObjectURL(url);
     
-    setSnackbar({
-      open: true,
-      message: 'Results exported as CSV',
-      severity: 'success',
-    });
+    setMessage('Results exported as CSV');
   };
   
-  const handleResetDatabase = async () => {
+  const handleResetDatabase = () => {
     if (confirm('Are you sure you want to reset the database to its initial state?')) {
-      try {
-        await resetDatabase();
-        setSnackbar({
-          open: true,
-          message: 'Database reset successfully',
-          severity: 'success',
-        });
-      } catch (error) {
-        setSnackbar({
-          open: true,
-          message: 'Failed to reset database',
-          severity: 'error',
-        });
-      }
+      resetDatabase();
+      setMessage('Database reset successfully');
     }
   };
   
+  const handleSchemaChange = (newSchema: keyof typeof schemas) => {
+    setSelectedSchema(newSchema);
+    setQuery(`SELECT * FROM ${newSchema} LIMIT 10;`);
+  };
+  
   const handleDeleteSavedQuery = (index: number) => {
-    const newSavedQueries = savedQueries.filter((_, i) => i !== index);
-    setSavedQueries(newSavedQueries);
-    setSnackbar({
-      open: true,
-      message: 'Query deleted',
-      severity: 'info',
-    });
+    const newSavedQueries = savedQueries.filter((_: any, i: number) => i !== index);
+    updatePlayground('playground', { savedQueries: newSavedQueries });
+    setMessage('Query deleted');
   };
   
   return (
@@ -204,38 +170,49 @@ export default function PlaygroundPage() {
         </Typography>
       </Box>
       
-      {/* Database Selector and Actions */}
+      {/* Database Selector */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 2 }}>
         <FormControl sx={{ minWidth: 200 }}>
           <InputLabel>Database</InputLabel>
           <Select
-            value={selectedDatabase}
-            onChange={(e) => setSelectedDatabase(e.target.value as keyof typeof databaseConfigs)}
+            value={selectedSchema}
+            onChange={(e) => handleSchemaChange(e.target.value as keyof typeof schemas)}
             label="Database"
+            disabled={!isReady}
           >
-            <MenuItem value="basic">Basic (Companies)</MenuItem>
-            <MenuItem value="intermediate">Intermediate (Companies + Positions)</MenuItem>
-            <MenuItem value="advanced">Advanced (Employees + Projects)</MenuItem>
-            <MenuItem value="fullPlayground">Full Playground (All Tables)</MenuItem>
+            {Object.keys(schemas).map(schema => (
+              <MenuItem key={schema} value={schema}>
+                {schema.charAt(0).toUpperCase() + schema.slice(1)}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
         
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" onClick={handleResetDatabase}>
-            Reset Database
-          </Button>
-          <Tooltip title="Database schema info">
-            <IconButton>
-              <Info />
-            </IconButton>
-          </Tooltip>
-        </Box>
+        <Button 
+          variant="outlined" 
+          startIcon={<Refresh />}
+          onClick={handleResetDatabase}
+          disabled={!isReady}
+        >
+          Reset Database
+        </Button>
       </Box>
       
       {/* Available Tables */}
       {tableNames.length > 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Available tables: {tableNames.join(', ')}
+        </Alert>
+      )}
+      
+      {/* Messages */}
+      {message && (
+        <Alert 
+          severity="info" 
+          sx={{ mb: 2 }}
+          onClose={() => setMessage(null)}
+        >
+          {message}
         </Alert>
       )}
       
@@ -246,7 +223,7 @@ export default function PlaygroundPage() {
             <Button
               startIcon={<PlayArrow />}
               onClick={handleExecute}
-              disabled={!query.trim() || isExecuting}
+              disabled={!query.trim() || isExecuting || !isReady}
               variant="contained"
             >
               Execute
@@ -286,6 +263,7 @@ export default function PlaygroundPage() {
         </Tabs>
         
         <Box sx={{ p: 2 }}>
+          {/* Results Tab */}
           {currentTab === 0 && (
             <>
               {queryError && (
@@ -304,6 +282,7 @@ export default function PlaygroundPage() {
             </>
           )}
           
+          {/* History Tab */}
           {currentTab === 1 && (
             <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
               {history.length > 0 ? (
@@ -319,7 +298,7 @@ export default function PlaygroundPage() {
                     }}
                     onClick={() => setQuery(item.query)}
                   >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Typography 
                         variant="body2" 
                         sx={{ 
@@ -351,10 +330,11 @@ export default function PlaygroundPage() {
             </Box>
           )}
           
+          {/* Saved Queries Tab */}
           {currentTab === 2 && (
             <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
               {savedQueries.length > 0 ? (
-                savedQueries.map((saved, index) => (
+                savedQueries.map((saved: any, index: number) => (
                   <Paper
                     key={index}
                     sx={{
@@ -363,7 +343,7 @@ export default function PlaygroundPage() {
                       '&:hover': { bgcolor: 'action.hover' },
                     }}
                   >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Box sx={{ flexGrow: 1, cursor: 'pointer' }} onClick={() => handleLoadQuery(saved)}>
                         <Typography variant="subtitle2" gutterBottom>
                           {saved.name}
@@ -400,14 +380,6 @@ export default function PlaygroundPage() {
           )}
         </Box>
       </Paper>
-      
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        message={snackbar.message}
-      />
     </Container>
   );
 }

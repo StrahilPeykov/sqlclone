@@ -1,3 +1,4 @@
+import { useState, useEffect, useMemo } from 'react';
 import {
   Drawer,
   List,
@@ -10,6 +11,8 @@ import {
   Divider,
   Typography,
   Chip,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   ExpandLess,
@@ -19,31 +22,58 @@ import {
   Book,
   Code,
 } from '@mui/icons-material';
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store';
-import { useAllComponents } from '@/features/content/ContentLoader';
 
 interface SidebarProps {
   open: boolean;
 }
 
+interface ComponentMeta {
+  id: string;
+  name: string;
+  type: 'concept' | 'skill';
+  description?: string;
+  prerequisites: string[];
+}
+
 export function Sidebar({ open }: SidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const components = useAppStore(state => state.components);
+  
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     concepts: true,
     skills: true,
   });
   
-  const user = useAppStore((state) => state.user);
-  const { data: components = [] } = useAllComponents();
+  const [contentIndex, setContentIndex] = useState<ComponentMeta[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load content index
+  useEffect(() => {
+    fetch('/content/index.json')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load content');
+        return res.json();
+      })
+      .then(data => {
+        setContentIndex(data);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setIsLoading(false);
+      });
+  }, []);
   
   // Group components by type
   const groupedComponents = useMemo(() => {
-    const concepts = components.filter((c) => c.type === 'concept');
-    const skills = components.filter((c) => c.type === 'skill');
+    const concepts = contentIndex.filter((c) => c.type === 'concept');
+    const skills = contentIndex.filter((c) => c.type === 'skill');
     return { concepts, skills };
-  }, [components]);
+  }, [contentIndex]);
   
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -52,24 +82,96 @@ export function Sidebar({ open }: SidebarProps) {
     }));
   };
   
-  const handleNavigate = (componentId: string) => {
-    navigate(`/learn/${componentId}`);
+  const handleNavigate = (type: 'concept' | 'skill', componentId: string) => {
+    navigate(`/${type}/${componentId}`);
   };
   
-  const isCompleted = (componentId: string) => {
-    return user?.progress[componentId]?.completed || false;
-  };
-  
-  const getProgress = (componentId: string) => {
-    const progress = user?.progress[componentId];
-    if (!progress) return null;
+  const isCompleted = (component: ComponentMeta) => {
+    const state = components[component.id];
+    if (!state) return false;
     
-    if (progress.type === 'skill' && progress.exercisesCompleted) {
-      return `${progress.exercisesCompleted}/3`;
+    // For concepts, check if understood
+    if (component.type === 'concept') {
+      return state.understood === true;
+    }
+    
+    // For skills, check if completed (3+ exercises)
+    return (state.numSolved || 0) >= 3;
+  };
+  
+  const getProgress = (component: ComponentMeta) => {
+    const state = components[component.id];
+    if (!state) return null;
+    
+    // For skills, show exercise progress
+    if (component.type === 'skill' && state.numSolved) {
+      return `${state.numSolved}/3`;
     }
     
     return null;
   };
+  
+  const isActive = (component: ComponentMeta) => {
+    const path = location.pathname;
+    return path.includes(`/${component.type}/${component.id}`);
+  };
+  
+  // Loading state
+  if (isLoading && open) {
+    return (
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: open ? 240 : 72,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: open ? 240 : 72,
+            boxSizing: 'border-box',
+            top: 64,
+            transition: 'width 0.3s',
+            overflowX: 'hidden',
+            bgcolor: 'background.paper',
+            borderRight: 1,
+            borderColor: 'divider',
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress size={24} />
+        </Box>
+      </Drawer>
+    );
+  }
+  
+  // Error state
+  if (error && open) {
+    return (
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: open ? 240 : 72,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: open ? 240 : 72,
+            boxSizing: 'border-box',
+            top: 64,
+            transition: 'width 0.3s',
+            overflowX: 'hidden',
+            bgcolor: 'background.paper',
+            borderRight: 1,
+            borderColor: 'divider',
+          },
+        }}
+      >
+        <Alert severity="error" sx={{ m: 2 }}>
+          {error}
+        </Alert>
+      </Drawer>
+    );
+  }
+  
+  const completedConcepts = groupedComponents.concepts.filter(c => isCompleted(c)).length;
+  const completedSkills = groupedComponents.skills.filter(s => isCompleted(s)).length;
   
   return (
     <Drawer
@@ -100,7 +202,7 @@ export function Sidebar({ open }: SidebarProps) {
                 </ListItemIcon>
                 <ListItemText
                   primary="Concepts"
-                  secondary={`${groupedComponents.concepts.filter(c => isCompleted(c.id)).length}/${groupedComponents.concepts.length}`}
+                  secondary={`${completedConcepts}/${groupedComponents.concepts.length}`}
                 />
                 {expandedSections.concepts ? <ExpandLess /> : <ExpandMore />}
               </ListItemButton>
@@ -108,40 +210,51 @@ export function Sidebar({ open }: SidebarProps) {
             
             <Collapse in={expandedSections.concepts} timeout="auto" unmountOnExit>
               <List component="div" disablePadding>
-                {groupedComponents.concepts.map((concept) => (
-                  <ListItem
-                    key={concept.id}
-                    disablePadding
-                    sx={{ pl: 2 }}
-                  >
-                    <ListItemButton
-                      onClick={() => handleNavigate(concept.id)}
-                      sx={{
-                        py: 0.5,
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                        },
-                      }}
+                {groupedComponents.concepts.map((concept) => {
+                  const completed = isCompleted(concept);
+                  const active = isActive(concept);
+                  
+                  return (
+                    <ListItem
+                      key={concept.id}
+                      disablePadding
+                      sx={{ pl: 2 }}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        {isCompleted(concept.id) ? (
-                          <CheckCircle color="success" fontSize="small" />
-                        ) : (
-                          <RadioButtonUnchecked fontSize="small" />
-                        )}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={concept.name}
-                        primaryTypographyProps={{
-                          fontSize: '0.875rem',
-                          color: isCompleted(concept.id)
-                            ? 'text.secondary'
-                            : 'text.primary',
+                      <ListItemButton
+                        onClick={() => handleNavigate('concept', concept.id)}
+                        selected={active}
+                        sx={{
+                          py: 0.5,
+                          '&:hover': {
+                            bgcolor: 'action.hover',
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: 'action.selected',
+                            '&:hover': {
+                              bgcolor: 'action.selected',
+                            },
+                          },
                         }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          {completed ? (
+                            <CheckCircle color="success" fontSize="small" />
+                          ) : (
+                            <RadioButtonUnchecked fontSize="small" />
+                          )}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={concept.name}
+                          primaryTypographyProps={{
+                            fontSize: '0.875rem',
+                            color: completed ? 'text.secondary' : 'text.primary',
+                            fontWeight: active ? 500 : 400,
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
               </List>
             </Collapse>
           </List>
@@ -157,7 +270,7 @@ export function Sidebar({ open }: SidebarProps) {
                 </ListItemIcon>
                 <ListItemText
                   primary="Skills"
-                  secondary={`${groupedComponents.skills.filter(c => isCompleted(c.id)).length}/${groupedComponents.skills.length}`}
+                  secondary={`${completedSkills}/${groupedComponents.skills.length}`}
                 />
                 {expandedSections.skills ? <ExpandLess /> : <ExpandMore />}
               </ListItemButton>
@@ -166,7 +279,9 @@ export function Sidebar({ open }: SidebarProps) {
             <Collapse in={expandedSections.skills} timeout="auto" unmountOnExit>
               <List component="div" disablePadding>
                 {groupedComponents.skills.map((skill) => {
-                  const progress = getProgress(skill.id);
+                  const progress = getProgress(skill);
+                  const completed = isCompleted(skill);
+                  const active = isActive(skill);
                   
                   return (
                     <ListItem
@@ -175,16 +290,23 @@ export function Sidebar({ open }: SidebarProps) {
                       sx={{ pl: 2 }}
                     >
                       <ListItemButton
-                        onClick={() => handleNavigate(skill.id)}
+                        onClick={() => handleNavigate('skill', skill.id)}
+                        selected={active}
                         sx={{
                           py: 0.5,
                           '&:hover': {
                             bgcolor: 'action.hover',
                           },
+                          '&.Mui-selected': {
+                            bgcolor: 'action.selected',
+                            '&:hover': {
+                              bgcolor: 'action.selected',
+                            },
+                          },
                         }}
                       >
                         <ListItemIcon sx={{ minWidth: 32 }}>
-                          {isCompleted(skill.id) ? (
+                          {completed ? (
                             <CheckCircle color="success" fontSize="small" />
                           ) : (
                             <RadioButtonUnchecked fontSize="small" />
@@ -194,16 +316,15 @@ export function Sidebar({ open }: SidebarProps) {
                           primary={skill.name}
                           primaryTypographyProps={{
                             fontSize: '0.875rem',
-                            color: isCompleted(skill.id)
-                              ? 'text.secondary'
-                              : 'text.primary',
+                            color: completed ? 'text.secondary' : 'text.primary',
+                            fontWeight: active ? 500 : 400,
                           }}
                         />
                         {progress && (
                           <Chip
                             label={progress}
                             size="small"
-                            color={isCompleted(skill.id) ? 'success' : 'default'}
+                            color={completed ? 'success' : 'default'}
                             sx={{ height: 20, fontSize: '0.75rem' }}
                           />
                         )}
@@ -216,16 +337,16 @@ export function Sidebar({ open }: SidebarProps) {
           </List>
           
           {/* Stats Summary */}
-          <Box sx={{ p: 2, mt: 'auto' }}>
+          <Box sx={{ p: 2, mt: 'auto', borderTop: 1, borderColor: 'divider' }}>
             <Typography variant="caption" color="text.secondary">
               Progress Summary
             </Typography>
             <Box sx={{ mt: 1 }}>
               <Typography variant="body2">
-                Concepts: {groupedComponents.concepts.filter(c => isCompleted(c.id)).length}/{groupedComponents.concepts.length}
+                Concepts: {completedConcepts}/{groupedComponents.concepts.length}
               </Typography>
               <Typography variant="body2">
-                Skills: {groupedComponents.skills.filter(c => isCompleted(c.id)).length}/{groupedComponents.skills.length}
+                Skills: {completedSkills}/{groupedComponents.skills.length}
               </Typography>
             </Box>
           </Box>
@@ -246,7 +367,7 @@ export function Sidebar({ open }: SidebarProps) {
           <ListItem disablePadding>
             <ListItemButton
               sx={{ justifyContent: 'center' }}
-              onClick={() => navigate('/practice')}
+              onClick={() => navigate('/learn')}
             >
               <ListItemIcon sx={{ justifyContent: 'center' }}>
                 <Code />

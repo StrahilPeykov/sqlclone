@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -8,27 +9,76 @@ import {
   Button,
   Grid,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import { CheckCircle, PlayArrow } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store';
-import { useContentIndex } from '@/features/content/ContentService';
+
+interface ComponentMeta {
+  id: string;
+  name: string;
+  type: 'concept' | 'skill';
+  description?: string;
+  prerequisites: string[];
+}
 
 export default function LearningOverviewPage() {
   const navigate = useNavigate();
-  const user = useAppStore((state) => state.user);
+  const components = useAppStore(state => state.components);
   
-  const { data: contentIndex, isLoading, error } = useContentIndex();
+  const [contentIndex, setContentIndex] = useState<ComponentMeta[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const concepts = contentIndex?.filter((item) => item.type === 'concept') || [];
-  const skills = contentIndex?.filter((item) => item.type === 'skill') || [];
+  // Load content index
+  useEffect(() => {
+    fetch('/content/index.json')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load content');
+        return res.json();
+      })
+      .then(data => {
+        setContentIndex(data);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setIsLoading(false);
+      });
+  }, []);
+
+  const concepts = contentIndex.filter(item => item.type === 'concept');
+  const skills = contentIndex.filter(item => item.type === 'skill');
 
   const isCompleted = (id: string) => {
-    return user?.progress[id]?.completed || false;
+    const component = components[id];
+    if (!component) return false;
+    
+    // For concepts, check if understood
+    if (concepts.find(c => c.id === id)) {
+      return component.understood === true;
+    }
+    
+    // For skills, check if completed (3+ exercises)
+    return (component.numSolved || 0) >= 3;
   };
 
-  const renderItem = (item: any, type: 'concept' | 'skill') => {
+  const getProgress = (id: string) => {
+    const component = components[id];
+    if (!component) return null;
+    
+    // For skills, return exercise progress
+    if (skills.find(s => s.id === id) && component.numSolved) {
+      return `${component.numSolved}/3`;
+    }
+    
+    return null;
+  };
+
+  const renderItem = (item: ComponentMeta, type: 'concept' | 'skill') => {
     const completed = isCompleted(item.id);
+    const progress = getProgress(item.id);
     
     return (
       <Grid item xs={12} sm={6} md={4} key={item.id}>
@@ -74,15 +124,17 @@ export default function LearningOverviewPage() {
                   {item.description}
                 </Typography>
                 
-                {item.estimatedTime && (
+                {progress && (
                   <Typography 
                     variant="caption" 
-                    color="text.secondary"
-                    sx={{ display: 'block' }}
+                    color="primary"
+                    sx={{ display: 'block', fontWeight: 500 }}
                   >
-                    {item.estimatedTime} minutes
+                    Progress: {progress}
                   </Typography>
                 )}
+                
+                {/* Estimated time removed */}
                 
                 {item.prerequisites && item.prerequisites.length > 0 && (
                   <Typography 
@@ -127,12 +179,15 @@ export default function LearningOverviewPage() {
   if (error) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Typography color="error" sx={{ mb: 2 }}>
-          Failed to load content: {error instanceof Error ? error.message : 'Unknown error'}
-        </Typography>
+        <Alert severity="error">
+          Failed to load content: {error}
+        </Alert>
       </Container>
     );
   }
+
+  const completedConcepts = concepts.filter(c => isCompleted(c.id)).length;
+  const completedSkills = skills.filter(s => isCompleted(s.id)).length;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -150,7 +205,7 @@ export default function LearningOverviewPage() {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', gap: 4 }}>
         <Box sx={{ textAlign: 'center' }}>
           <Typography variant="h4" color="primary">
-            {concepts.filter(c => isCompleted(c.id)).length}/{concepts.length}
+            {completedConcepts}/{concepts.length}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Concepts Completed
@@ -158,7 +213,7 @@ export default function LearningOverviewPage() {
         </Box>
         <Box sx={{ textAlign: 'center' }}>
           <Typography variant="h4" color="primary">
-            {skills.filter(s => isCompleted(s.id)).length}/{skills.length}
+            {completedSkills}/{skills.length}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Skills Mastered
@@ -167,24 +222,28 @@ export default function LearningOverviewPage() {
       </Box>
 
       {/* Concepts */}
-      <Box sx={{ mb: 6 }}>
-        <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 500, mb: 3 }}>
-          Concepts
-        </Typography>
-        <Grid container spacing={3}>
-          {concepts.map((concept) => renderItem(concept, 'concept'))}
-        </Grid>
-      </Box>
+      {concepts.length > 0 && (
+        <Box sx={{ mb: 6 }}>
+          <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 500, mb: 3 }}>
+            Concepts
+          </Typography>
+          <Grid container spacing={3}>
+            {concepts.map((concept) => renderItem(concept, 'concept'))}
+          </Grid>
+        </Box>
+      )}
 
       {/* Skills */}
-      <Box>
-        <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 500, mb: 3 }}>
-          Skills
-        </Typography>
-        <Grid container spacing={3}>
-          {skills.map((skill) => renderItem(skill, 'skill'))}
-        </Grid>
-      </Box>
+      {skills.length > 0 && (
+        <Box>
+          <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 500, mb: 3 }}>
+            Skills
+          </Typography>
+          <Grid container spacing={3}>
+            {skills.map((skill) => renderItem(skill, 'skill'))}
+          </Grid>
+        </Box>
+      )}
     </Container>
   );
 }

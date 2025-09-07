@@ -1,113 +1,114 @@
 import { create } from 'zustand';
+import { useCallback } from 'react';
 import { persist } from 'zustand/middleware';
 
-// Types
-export interface User {
-  id: string;
-  progress: Record<string, ComponentProgress>;
-}
-
-export interface ComponentProgress {
-  componentId: string;
-  type: 'concept' | 'skill';
-  completed: boolean;
-  exercisesCompleted?: number;
+interface ComponentState {
+  // Component ID
+  id?: string;
+  
+  // For concepts
+  understood?: boolean;
+  tab?: string;
+  
+  // For skills
+  numSolved?: number;
+  exerciseHistory?: any[];
+  currentExercise?: any;
+  
+  // Common
   lastAccessed?: Date;
+  type?: 'concept' | 'skill';
 }
 
 interface AppState {
-  // User State
-  user: User | null;
+  // All component progress (replaces LocalStorageManager)
+  components: Record<string, ComponentState>;
   
-  // Navigation State
-  currentComponent: string | null;
-  currentTab: string;
-  
-  // UI State
-  isLoading: boolean;
-  error: string | null;
+  // UI state
   sidebarOpen: boolean;
-}
-
-interface AppActions {
-  // User Actions
-  setUser: (user: User) => void;
-  updateProgress: (componentId: string, progress: Partial<ComponentProgress>) => void;
+  currentTheme: 'light' | 'dark';
   
-  // Navigation Actions
-  setCurrentComponent: (componentId: string | null) => void;
-  setCurrentTab: (tab: string) => void;
-  
-  // UI Actions
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
+  // Actions
+  updateComponent: (id: string, data: Partial<ComponentState>) => void;
+  getComponent: (id: string) => ComponentState;
+  resetComponent: (id: string) => void;
   toggleSidebar: () => void;
-  
-  // Utility Actions
-  reset: () => void;
+  setTheme: (theme: 'light' | 'dark') => void;
 }
 
-const initialState: AppState = {
-  user: {
-    id: 'default-user',
-    progress: {},
-  },
-  currentComponent: null,
-  currentTab: 'theory',
-  isLoading: false,
-  error: null,
-  sidebarOpen: true,
-};
-
-export const useAppStore = create<AppState & AppActions>()(
+export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
-      ...initialState,
+    (set, get) => ({
+      components: {},
+      sidebarOpen: true,
+      currentTheme: 'dark',
       
-      // User Actions
-      setUser: (user) => set({ user }),
-      
-      updateProgress: (componentId, progress) => set((state) => {
-        if (!state.user) return state;
+      updateComponent: (id, data) => 
+        set(state => ({
+          components: {
+            ...state.components,
+            [id]: { 
+              ...state.components[id], 
+              ...data,
+              id,
+              lastAccessed: new Date()
+            }
+          }
+        })),
         
-        const existing = state.user.progress[componentId] || {
-          componentId,
-          type: 'concept',
-          completed: false,
-        };
-        
-        return {
-          user: {
-            ...state.user,
-            progress: {
-              ...state.user.progress,
-              [componentId]: {
-                ...existing,
-                ...progress,
-                lastAccessed: new Date(),
-              },
-            },
-          },
-        };
-      }),
+      getComponent: (id) => get().components[id] || { id },
       
-      // Navigation Actions
-      setCurrentComponent: (componentId) => set({ currentComponent: componentId }),
-      setCurrentTab: (tab) => set({ currentTab: tab }),
+      resetComponent: (id) =>
+        set(state => ({
+          components: {
+            ...state.components,
+            [id]: { id }
+          }
+        })),
       
-      // UI Actions
-      setLoading: (loading) => set({ isLoading: loading }),
-      setError: (error) => set({ error }),
-      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      toggleSidebar: () => 
+        set(state => ({ sidebarOpen: !state.sidebarOpen })),
       
-      // Utility Actions
-      reset: () => set(initialState),
+      setTheme: (theme) =>
+        set({ currentTheme: theme }),
     }),
     {
       name: 'sql-valley-storage',
       partialize: (state) => ({
-        user: state.user,
+        components: state.components,
+        currentTheme: state.currentTheme,
       }),
     }
   )
 );
+
+// Helper hooks for backward compatibility with old LocalStorageManager
+export function useComponentState(componentId: string) {
+  const component = useAppStore(state => state.components[componentId] || { id: componentId });
+  const updateComponent = useAppStore(state => state.updateComponent);
+  
+  const setComponentState = useCallback((data: Partial<ComponentState> | ((prev: ComponentState) => Partial<ComponentState>)) => {
+    if (typeof data === 'function') {
+      const currentState = useAppStore.getState().components[componentId] || { id: componentId };
+      const newData = data(currentState);
+      updateComponent(componentId, newData);
+    } else {
+      updateComponent(componentId, data);
+    }
+  }, [componentId, updateComponent]);
+  
+  return [component, setComponentState] as const;
+}
+
+// Compatibility hook for old localStorage pattern
+export function useLocalStorageState(key: string, initialValue: any) {
+  // Extract component ID from key (e.g., "component-database" -> "database")
+  const componentId = key.replace('component-', '');
+  return useComponentState(componentId);
+}
+
+// Hook to check if localStorage is initialized
+export function useIsLocalStorageInitialized() {
+  // Zustand persist is always ready after first render
+  return true;
+}
