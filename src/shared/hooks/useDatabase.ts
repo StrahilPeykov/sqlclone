@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSQLJS } from '@/shared/providers/SQLJSProvider';
-import { useAppStore } from '@/store';
 
 interface QueryResult {
   columns: string[];
@@ -21,7 +20,7 @@ interface UseDatabaseReturn {
 
 export function useDatabase(schema?: string): UseDatabaseReturn {
   const SQLJS = useSQLJS();
-  const getSharedDatabase = useAppStore(state => state.getDatabase);
+  
   const [db, setDb] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -29,28 +28,56 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
   const [queryError, setQueryError] = useState<Error | null>(null);
   const [tableNames, setTableNames] = useState<string[]>([]);
   
-  // Initialize database with schema using shared cache
+  // Initialize database with schema
+  const initializeDatabase = useCallback(() => {
+    if (!SQLJS || !schema) return null;
+    
+    try {
+      const database = new SQLJS.Database();
+      database.run(schema);
+      return database;
+    } catch (err) {
+      console.error('Database initialization error:', err);
+      setError(err instanceof Error ? err.message : 'Database setup failed');
+      return null;
+    }
+  }, [SQLJS, schema]);
+  
+  // Set up database when SQLJS and schema are ready
   useEffect(() => {
     if (SQLJS && schema) {
-      try {
-        // Use shared database from store instead of creating new instance
-        const database = getSharedDatabase(schema, SQLJS);
+      const database = initializeDatabase();
+      if (database) {
         setDb(database);
         setError(null);
         
         // Get table names
-        const tables = database.exec(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
-        );
-        if (tables[0]) {
-          setTableNames(tables[0].values.map((row: any[]) => row[0]));
+        try {
+          const tables = database.exec(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+          );
+          if (tables[0]) {
+            setTableNames(tables[0].values.map((row: any[]) => row[0]));
+          }
+        } catch (err) {
+          console.warn('Could not fetch table names:', err);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Database setup failed');
-        console.error('Database initialization error:', err);
       }
     }
-  }, [SQLJS, schema, getSharedDatabase]);
+  }, [SQLJS, schema, initializeDatabase]);
+  
+  // Cleanup database on unmount
+  useEffect(() => {
+    return () => {
+      if (db && typeof db.close === 'function') {
+        try {
+          db.close();
+        } catch (err) {
+          console.warn('Error closing database:', err);
+        }
+      }
+    };
+  }, [db]);
   
   // Execute query function
   const executeQuery = useCallback(async (query: string): Promise<QueryResult[]> => {
@@ -76,16 +103,23 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
   
   // Reset database to initial state
   const resetDatabase = useCallback(() => {
-    if (SQLJS && schema) {
+    if (db && typeof db.close === 'function') {
       try {
-        // Create new database instance
-        const database = getSharedDatabase(schema, SQLJS);
-        setDb(database);
-        setQueryResult(null);
-        setQueryError(null);
-        setError(null);
-        
-        // Update table names
+        db.close();
+      } catch (err) {
+        console.warn('Error closing old database:', err);
+      }
+    }
+    
+    const database = initializeDatabase();
+    if (database) {
+      setDb(database);
+      setQueryResult(null);
+      setQueryError(null);
+      setError(null);
+      
+      // Update table names
+      try {
         const tables = database.exec(
           "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
         );
@@ -93,11 +127,10 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
           setTableNames(tables[0].values.map((row: any[]) => row[0]));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Database reset failed');
+        console.warn('Could not fetch table names after reset:', err);
       }
     }
-  }, [SQLJS, schema, getSharedDatabase]);
-  
+  }, [initializeDatabase]);
   
   return { 
     database: db,
@@ -109,46 +142,5 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
     queryResult,
     queryError,
     tableNames
-  };
-}
-
-// Helper hook for skill-specific databases
-export function useSkillDatabase(skillId: string, isTest: boolean = false) {
-  // Import schemas dynamically to avoid circular dependencies
-  const [schemas, setSchemas] = useState<Record<string, string>>({});
-  
-  useEffect(() => {
-    import('@/features/database/schemas').then(({ schemas: importedSchemas }) => {
-      setSchemas(importedSchemas);
-    });
-  }, []);
-  
-  const schema = schemas[skillId] || schemas.companies; // Default to companies schema
-  const result = useDatabase(schema);
-  
-  // Store database reference in component state if needed
-  const updateComponent = useAppStore(state => state.updateComponent);
-  
-  useEffect(() => {
-    if (result.database) {
-      updateComponent(skillId, { 
-        database: isTest ? 'test' : 'practice',
-        dbReady: true 
-      });
-    }
-  }, [result.database, skillId, isTest, updateComponent]);
-  
-  return result;
-}
-
-// Hook to clear all cached databases (useful for memory management)
-export function useDatabaseManager() {
-  const clearDatabases = useAppStore(state => state.clearDatabases);
-  const databases = useAppStore(state => state.databases);
-  
-  return {
-    clearAll: clearDatabases,
-    count: Object.keys(databases).length,
-    schemas: Object.keys(databases),
   };
 }

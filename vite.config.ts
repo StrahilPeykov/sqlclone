@@ -22,10 +22,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@features': path.resolve(__dirname, './src/features'),
-      '@shared': path.resolve(__dirname, './src/shared'),
-      '@content': path.resolve(__dirname, './src/content'),
-      '@types': path.resolve(__dirname, './src/types'),
     },
   },
   server: {
@@ -41,6 +37,7 @@ export default defineConfig({
           mui: ['@mui/material', '@mui/icons-material'],
           sql: ['sql.js'],
           editor: ['@codemirror/lang-sql', '@uiw/react-codemirror'],
+          zustand: ['zustand'],
         },
       },
     },

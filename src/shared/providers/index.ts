@@ -1,4 +1,4 @@
-// Only export what we're keeping - SQLJSProvider
+// Core providers for the application
 export { 
   SQLJSProvider, 
   useSQLJS, 
@@ -6,6 +6,3 @@ export {
   useSQLJSError,
   useSQLJSContext
 } from './SQLJSProvider';
-
-// Note: LocalStorageManager and SkillDatabaseProvider have been removed
-// Their functionality is now handled by the Zustand store in src/store/index.ts
