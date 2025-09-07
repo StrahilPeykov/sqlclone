@@ -16,7 +16,7 @@ import {
 } from '@mui/icons-material';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
-import { useDatabase } from '@/features/database/hooks/useDatabase';
+import { useDatabase } from '@/shared/hooks/useDatabase';
 
 interface ExerciseCardProps {
   exercise: {

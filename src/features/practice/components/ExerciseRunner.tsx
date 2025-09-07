@@ -18,8 +18,8 @@ import {
   PlayArrow,
 } from '@mui/icons-material';
 
-import { SQLEditor } from '@/shared/components/SQLEditor/SQLEditor';
-import { useDatabase } from '@/features/database/hooks/useDatabase';
+import { SQLEditor } from '@/shared/components/SQLEditor';
+import { useDatabase } from '@/shared/hooks/useDatabase';
 import { schemas } from '@/features/database/schemas';
 
 interface Exercise {

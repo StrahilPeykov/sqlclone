@@ -11,7 +11,7 @@ import {
   Snackbar,
   CircularProgress,
 } from '@mui/material';
-import { PlayArrow, CheckCircle, ArrowBack, Refresh } from '@mui/icons-material';
+import { PlayArrow, CheckCircle, ArrowBack, Refresh, ArrowForward } from '@mui/icons-material';
 
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
@@ -46,6 +46,7 @@ export default function SkillPage() {
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [selectedSchemaKey, setSelectedSchemaKey] = useState<keyof typeof schemas>('companies');
+  const [exerciseCompleted, setExerciseCompleted] = useState(false);
   
   // Skill metadata
   const [skillMeta, setSkillMeta] = useState<any>(null);
@@ -169,6 +170,7 @@ export default function SkillPage() {
     setQuery('');
     setFeedback(null);
     setShowHint(false);
+    setExerciseCompleted(false);
   }, [skillContent, componentState.exerciseHistory]);
 
   // Initialize first exercise when DB ready
@@ -227,9 +229,8 @@ export default function SkillPage() {
           message: `Excellent! Exercise completed successfully! (${nextSolved}/${requiredCount})`, 
           type: 'success' 
         });
-
-        // Always move to another exercise for continued practice
-        generateExercise();
+        // Mark current exercise as completed; require explicit click to continue
+        setExerciseCompleted(true);
       } else {
         setFeedback({
           message: 'Not quite right. Check your query and try again!',
@@ -374,13 +375,27 @@ export default function SkillPage() {
             >
               Auto-complete
             </Button>
-            <Button
-              size="small"
-              startIcon={<Refresh />}
-              onClick={handleNewExercise}
-            >
-              New Exercise
-            </Button>
+            {!exerciseCompleted ? (
+              <Button
+                size="small"
+                startIcon={<Refresh />}
+                onClick={handleNewExercise}
+                disabled={isExecuting}
+                title="Try a different exercise"
+              >
+                Try Another
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<ArrowForward />}
+                onClick={handleNewExercise}
+                title="Proceed to the next exercise"
+              >
+                Next Exercise
+              </Button>
+            )}
             <Button
               variant="contained"
               size="small"

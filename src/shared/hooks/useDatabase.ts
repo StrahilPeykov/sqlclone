@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSQLJS } from '@/shared/providers/SQLJSProvider';
+import { useAppStore } from '@/store';
+import { useDatabaseCleanup } from '@/shared/hooks/useDatabaseCleanup';
 
 interface QueryResult {
   columns: string[];
@@ -20,6 +22,9 @@ interface UseDatabaseReturn {
 
 export function useDatabase(schema?: string): UseDatabaseReturn {
   const SQLJS = useSQLJS();
+  const getSharedDatabase = useAppStore(state => state.getDatabase);
+  const { cleanupDatabase } = useDatabaseCleanup();
+  
   const [db, setDb] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -27,12 +32,12 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
   const [queryError, setQueryError] = useState<Error | null>(null);
   const [tableNames, setTableNames] = useState<string[]>([]);
   
-  // Initialize database with schema
+  // Initialize database with schema using shared cache
   useEffect(() => {
     if (SQLJS && schema) {
       try {
-        const database = new SQLJS.Database();
-        database.run(schema);
+        // Use shared database from store instead of creating new instance
+        const database = getSharedDatabase(schema, SQLJS);
         setDb(database);
         setError(null);
         
@@ -48,7 +53,7 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
         console.error('Database initialization error:', err);
       }
     }
-  }, [SQLJS, schema]);
+  }, [SQLJS, schema, getSharedDatabase]);
   
   // Execute query function
   const executeQuery = useCallback(async (query: string): Promise<QueryResult[]> => {
@@ -76,14 +81,11 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
   const resetDatabase = useCallback(() => {
     if (SQLJS && schema) {
       try {
-        // Close existing database if it exists
-        if (db) {
-          db.close();
-        }
-        
-        // Create new database
-        const database = new SQLJS.Database();
-        database.run(schema);
+        // Clear the specific database from shared cache and recreate
+        cleanupDatabase(schema);
+
+        // Create new database instance
+        const database = getSharedDatabase(schema, SQLJS);
         setDb(database);
         setQueryResult(null);
         setQueryError(null);
@@ -100,7 +102,15 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
         setError(err instanceof Error ? err.message : 'Database reset failed');
       }
     }
-  }, [SQLJS, schema, db]);
+  }, [SQLJS, schema, getSharedDatabase]);
+
+  // Cleanup on unmount or when schema changes
+  useEffect(() => {
+    if (!schema) return;
+    return () => {
+      cleanupDatabase(schema);
+    };
+  }, [schema, cleanupDatabase]);
   
   return { 
     database: db,
@@ -117,13 +127,20 @@ export function useDatabase(schema?: string): UseDatabaseReturn {
 
 // Helper hook for skill-specific databases
 export function useSkillDatabase(skillId: string, isTest: boolean = false) {
-  const { schemas } = require('@/features/database/schemas');
-  const schema = schemas[skillId] || schemas.companies; // Default to companies schema
+  // Import schemas dynamically to avoid circular dependencies
+  const [schemas, setSchemas] = useState<Record<string, string>>({});
   
+  useEffect(() => {
+    import('@/features/database/schemas').then(({ schemas: importedSchemas }) => {
+      setSchemas(importedSchemas);
+    });
+  }, []);
+  
+  const schema = schemas[skillId] || schemas.companies; // Default to companies schema
   const result = useDatabase(schema);
   
   // Store database reference in component state if needed
-  const { updateComponent } = require('@/store').useAppStore.getState();
+  const updateComponent = useAppStore(state => state.updateComponent);
   
   useEffect(() => {
     if (result.database) {
@@ -135,4 +152,16 @@ export function useSkillDatabase(skillId: string, isTest: boolean = false) {
   }, [result.database, skillId, isTest, updateComponent]);
   
   return result;
+}
+
+// Hook to clear all cached databases (useful for memory management)
+export function useDatabaseManager() {
+  const clearDatabases = useAppStore(state => state.clearDatabases);
+  const databases = useAppStore(state => state.databases);
+  
+  return {
+    clearAll: clearDatabases,
+    count: Object.keys(databases).length,
+    schemas: Object.keys(databases),
+  };
 }
