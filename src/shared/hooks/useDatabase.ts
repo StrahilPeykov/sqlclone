@@ -57,13 +57,12 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
   useEffect(() => {
     if (!contextReady || !resolvedSchema) return;
 
-    // Check if we need to reset due to schema change
     const schemaChanged = currentSchema !== resolvedSchema;
-    const shouldReset = !persistent || (resetOnSchemaChange && schemaChanged);
+    const needsInit = !database;
+    const shouldReset = resetOnSchemaChange && schemaChanged && !(context === 'playground' && persistent);
 
-    if (shouldReset || !database) {
-      // Reset the context if schema changed (except for persistent playground)
-      if (schemaChanged && !(context === 'playground' && persistent)) {
+    if (shouldReset || needsInit) {
+      if (shouldReset) {
         resetContextDatabase(context);
       }
 
@@ -90,15 +89,15 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
       }
     }
   }, [
-    contextReady, 
-    resolvedSchema, 
-    currentSchema, 
-    context, 
-    persistent, 
-    resetOnSchemaChange, 
-    getDatabase, 
+    contextReady,
+    resolvedSchema,
+    currentSchema,
+    context,
+    persistent,
+    resetOnSchemaChange,
+    getDatabase,
     resetContextDatabase,
-    database
+    database,
   ]);
 
   // Execute query function
@@ -115,7 +114,17 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
       setQueryResult(result);
       return result;
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Query execution failed');
+      const message = ((): string => {
+        if (err instanceof Error) return err.message;
+        if (typeof err === 'string') return err;
+        try {
+          // sql.js sometimes throws objects; best-effort stringify
+          return (err as any)?.message ?? JSON.stringify(err);
+        } catch {
+          return 'Query execution failed';
+        }
+      })();
+      const error = new Error(message || 'Query execution failed');
       setQueryError(error);
       throw error;
     } finally {

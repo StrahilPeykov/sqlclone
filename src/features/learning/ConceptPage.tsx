@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import {
   ArrowBack,
-  ArrowForward,
   CheckCircle,
   School,
   Lightbulb,
@@ -78,31 +77,56 @@ export default function ConceptPage() {
 
   useEffect(() => {
     if (!conceptId) return;
-    
-    // Load metadata from index
-    fetch('/content/index.json')
-      .then(res => res.json())
-      .then(data => {
-        const concept = data.find((c: any) => c.id === conceptId);
-        if (concept) {
-          setConceptMeta(concept);
-          
-          // Try to load concept content
-          return fetch(`/content/concepts/${conceptId}.json`);
+
+    const load = async () => {
+      try {
+        // Load metadata from index
+        const indexRes = await fetch('/content/index.json');
+        const indexData = await indexRes.json();
+        const concept = indexData.find((c: any) => c.id === conceptId);
+        if (!concept) throw new Error('Concept not found');
+
+        // If a folder-based content path exists, load from there
+        if (concept.contentPath) {
+          try {
+            const metaRes = await fetch(`/content/${concept.contentPath}/meta.json`);
+            const meta = await metaRes.json();
+
+            // Load MDX files as plain text
+            const [theoryRes, quickRes] = await Promise.all([
+              fetch(`/content/${concept.contentPath}/index.mdx`),
+              fetch(`/content/${concept.contentPath}/quick.mdx`),
+            ]);
+            const [theory, summary] = await Promise.all([
+              theoryRes.ok ? theoryRes.text() : Promise.resolve(''),
+              quickRes.ok ? quickRes.text() : Promise.resolve(''),
+            ]);
+
+            setConceptMeta({ ...concept, ...meta });
+            setConceptContent({ theory, summary });
+            setIsLoading(false);
+            return;
+          } catch (e) {
+            // Fall back to legacy JSON below
+            console.warn('Folder-based content missing, falling back to legacy JSON.', e);
+          }
         }
-        throw new Error('Concept not found');
-      })
-      .then(res => res.json())
-      .then(content => {
-        setConceptContent(content);
+
+        // Legacy JSON fallback
+        const legacyRes = await fetch(`/content/concepts/${conceptId}.json`);
+        const legacyContent = await legacyRes.json();
+        setConceptMeta(concept);
+        setConceptContent(legacyContent);
         setIsLoading(false);
-      })
-      .catch(err => {
+      } catch (err: any) {
         console.error('Failed to load concept:', err);
-        setError(err.message);
+        setError(err.message || 'Failed to load concept');
         setIsLoading(false);
-      });
-      
+      }
+    };
+
+    load();
+
     // Update last accessed
     if (componentState.type !== 'concept') {
       setComponentState({ type: 'concept' });
@@ -366,16 +390,6 @@ export default function ConceptPage() {
               startIcon={<CheckCircle />}
             >
               Mark as Complete
-            </Button>
-          )}
-          
-          {conceptContent?.nextConcepts?.[0] && (
-            <Button
-              variant="outlined"
-              endIcon={<ArrowForward />}
-              onClick={() => navigate(`/concept/${conceptContent.nextConcepts[0]}`)}
-            >
-              Next Concept
             </Button>
           )}
         </Box>

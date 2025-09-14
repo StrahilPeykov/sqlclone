@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useSQLJS } from './SQLJSProvider';
 
 export type DatabaseContextType = 'playground' | 'exercise' | 'concept';
@@ -38,6 +38,11 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     exercise: null,
     concept: null,
   });
+  const databasesRef = useRef<DatabaseState>({
+    playground: null,
+    exercise: null,
+    concept: null,
+  });
   
   const [isReady, setIsReady] = useState(false);
 
@@ -45,6 +50,11 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
   useEffect(() => {
     setIsReady(!!SQLJS);
   }, [SQLJS]);
+
+  // Keep a ref of the latest databases to use in stable callbacks/cleanup
+  useEffect(() => {
+    databasesRef.current = databases;
+  }, [databases]);
 
   // Create a database with the given schema and context-specific setup
   const createDatabase = useCallback((schema: string, context: DatabaseContextType) => {
@@ -79,28 +89,21 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
 
   // Get or create a database for the given context and schema
   const getDatabase = useCallback((context: DatabaseContextType, schema: string) => {
-    const existingDb = databases[context];
-    
-    // For exercises and concepts, always create fresh databases
-    if (context === 'exercise' || context === 'concept') {
-      const newDb = createDatabase(schema, context);
-      setDatabases(prev => ({ ...prev, [context]: newDb }));
-      return newDb;
-    }
-    
-    // For playground, reuse existing database or create new one
+    const existingDb = databasesRef.current[context];
+
+    // Reuse existing database or create new one if missing
     if (!existingDb) {
       const newDb = createDatabase(schema, context);
       setDatabases(prev => ({ ...prev, [context]: newDb }));
       return newDb;
     }
-    
+
     return existingDb;
-  }, [databases, createDatabase]);
+  }, [createDatabase]);
 
   // Reset a specific database context
   const resetDatabase = useCallback((context: DatabaseContextType) => {
-    const db = databases[context];
+    const db = databasesRef.current[context];
     if (db && typeof db.close === 'function') {
       try {
         db.close();
@@ -110,11 +113,11 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     }
     
     setDatabases(prev => ({ ...prev, [context]: null }));
-  }, [databases]);
+  }, []);
 
   // Reset all databases
   const resetAllDatabases = useCallback(() => {
-    Object.entries(databases).forEach(([context, db]) => {
+    Object.entries(databasesRef.current).forEach(([context, db]) => {
       if (db && typeof db.close === 'function') {
         try {
           db.close();
@@ -129,7 +132,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
       exercise: null,
       concept: null,
     });
-  }, [databases]);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {

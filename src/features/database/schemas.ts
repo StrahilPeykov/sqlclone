@@ -176,7 +176,7 @@ const skillSchemaMap: Record<string, keyof typeof schemas> = {
   'filtered-aggregation': 'companiesAndPositions',
   
   // Advanced skills - complex schemas
-  'multi-layered-query': 'employees',
+  'multi-layered-query': 'positions',
   
   // Add new skills here as needed
 };

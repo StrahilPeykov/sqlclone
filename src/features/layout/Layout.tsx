@@ -14,10 +14,11 @@ import {
   School as LearnIcon,
   PlayArrow as PlaygroundIcon,
 } from '@mui/icons-material';
-import { DarkMode, LightMode } from '@mui/icons-material';
+import { DarkMode, LightMode, RestartAlt } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { ColorModeContext } from '@/theme';
+import { useAppStore } from '@/store';
 
 export function Layout() {
   const navigate = useNavigate();
@@ -79,6 +80,9 @@ export function Layout() {
 
             {/* Theme toggle */}
             <ThemeToggle />
+
+            {/* Reset data */}
+            <ResetDataButton />
           </Toolbar>
         </Container>
       </AppBar>
@@ -105,6 +109,42 @@ function ThemeToggle() {
     <Tooltip title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}>
       <IconButton color="inherit" onClick={toggleColorMode} aria-label="toggle color mode">
         {isLight ? <DarkMode /> : <LightMode />}
+      </IconButton>
+    </Tooltip>
+  );
+}
+
+function ResetDataButton() {
+  const handleReset = () => {
+    const confirmed = window.confirm(
+      'Reset all your data? This clears progress, settings, and history.'
+    );
+    if (!confirmed) return;
+
+    try {
+      // Collect and remove app-specific localStorage keys
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (!key) continue;
+        if (key === 'sql-valley-storage' || key.startsWith('component-')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+
+      // Reload to fully reset in-memory state (avoids re-persisting stale store)
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to reset data:', err);
+      alert('Sorry, something went wrong resetting your data.');
+    }
+  };
+
+  return (
+    <Tooltip title="Reset all data">
+      <IconButton color="inherit" onClick={handleReset} aria-label="reset all data">
+        <RestartAlt />
       </IconButton>
     </Tooltip>
   );

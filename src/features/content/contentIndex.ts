@@ -9,6 +9,7 @@ export interface ContentEntryMeta {
   type: ContentType;
   description: string;
   prerequisites: string[];
+  contentPath?: string; // optional folder-based content location
 }
 
 const cache: Record<string, any> = {};
@@ -28,6 +29,27 @@ export async function loadContentIndex(): Promise<ContentEntryMeta[]> {
 
 export async function getConceptDetails(id: string): Promise<any | null> {
   try {
+    // Try folder-based content first by looking up index for contentPath
+    const index = await fetchJSON<any[]>('/content/index.json');
+    const entry = index.find(e => e.id === id);
+    if (entry && entry.contentPath) {
+      try {
+        const [theoryRes, quickRes] = await Promise.all([
+          fetch(`/content/${entry.contentPath}/index.mdx`),
+          fetch(`/content/${entry.contentPath}/quick.mdx`),
+        ]);
+        const [theory, summary] = await Promise.all([
+          theoryRes.ok ? theoryRes.text() : Promise.resolve(''),
+          quickRes.ok ? quickRes.text() : Promise.resolve(''),
+        ]);
+        // Return only text content; structural meta is handled elsewhere
+        return { theory, summary };
+      } catch (_) {
+        // Fall through to legacy JSON below
+      }
+    }
+
+    // Legacy JSON fallback
     return await fetchJSON<any>(`/content/concepts/${id}.json`);
   } catch {
     return null;
