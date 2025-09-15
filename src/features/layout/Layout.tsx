@@ -18,7 +18,6 @@ import { DarkMode, LightMode, RestartAlt } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { ColorModeContext } from '@/theme';
-import { useAppStore } from '@/store';
 
 export function Layout() {
   const navigate = useNavigate();
@@ -127,7 +126,7 @@ function ResetDataButton() {
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
         if (!key) continue;
-        if (key === 'sql-valley-storage' || key.startsWith('component-')) {
+        if (key === 'sqltutor-storage' || key.startsWith('component-')) {
           keysToRemove.push(key);
         }
       }

@@ -99,7 +99,7 @@ export const useAppStore = create<AppState>()(
         set({ _hasHydrated: hasHydrated }),
     }),
     {
-      name: 'sql-valley-storage',
+      name: 'sqltutor-storage',
       partialize: (state) => ({
         components: state.components,
         currentTheme: state.currentTheme,

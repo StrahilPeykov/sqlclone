@@ -31,7 +31,7 @@ export function Header() {
             for (let i = 0; i < window.localStorage.length; i++) {
                 const key = window.localStorage.key(i)
                 if (!key) continue
-                if (key === 'sql-valley-storage' || key.startsWith('component-'))
+                if (key === 'sqltutor-storage' || key.startsWith('component-'))
                     keysToRemove.push(key)
             }
             keysToRemove.forEach(k => window.localStorage.removeItem(k))

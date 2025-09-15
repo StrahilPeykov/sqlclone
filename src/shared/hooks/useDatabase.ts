@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDatabaseContext, DatabaseContextType } from '@/shared/providers/DatabaseProvider';
-import { schemas, getSchemaForSkill } from '@/features/database/schemas';
+import { schemas } from '@/features/database/schemas';
 
 interface QueryResult {
   columns: string[];
@@ -10,7 +10,6 @@ interface QueryResult {
 interface DatabaseOptions {
   context: DatabaseContextType;
   schema?: keyof typeof schemas;
-  skillId?: string; // Alternative to schema - will auto-detect schema
   resetOnSchemaChange?: boolean;
   persistent?: boolean; // Only applies to playground context
 }
@@ -31,7 +30,6 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
   const { 
     context, 
     schema, 
-    skillId, 
     resetOnSchemaChange = true,
     persistent = false 
   } = options;
@@ -47,11 +45,7 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
   const [tableNames, setTableNames] = useState<string[]>([]);
 
   // Determine which schema to use
-  const resolvedSchema = schema 
-    ? schemas[schema] 
-    : skillId 
-    ? schemas[getSchemaForSkill(skillId)]
-    : schemas.companies;
+  const resolvedSchema = schema ? schemas[schema] : schemas.companies;
 
   // Update database when schema changes, provider DB instance changes, or context is ready
   useEffect(() => {
@@ -59,12 +53,13 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
 
     const schemaChanged = currentSchema !== resolvedSchema;
     const providerDb = contextDatabases[context];
-    const shouldResetForSchema = resetOnSchemaChange && schemaChanged && !(context === 'playground' && persistent);
+    const shouldResetForSchema = resetOnSchemaChange && schemaChanged;
 
-    if (shouldResetForSchema) {
-      // Reset provider and clear local reference
+    if (shouldResetForSchema && contextDatabases[context]) {
+      // Only reset early if there is an existing provider DB to close
       resetContextDatabase(context);
       setDatabase(null);
+      return;
     }
 
     // If provider has no DB for this context, create it
@@ -92,7 +87,7 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
     }
 
     // If provider DB exists but local ref differs, sync it and refresh table names
-    if (database !== providerDb || schemaChanged) {
+    if (providerDb && (database !== providerDb || schemaChanged)) {
       setDatabase(providerDb);
       setCurrentSchema(resolvedSchema);
       setError(null);
@@ -184,16 +179,7 @@ export function usePlaygroundDatabase(schema: keyof typeof schemas = 'companiesA
     context: 'playground',
     schema,
     persistent: true,
-    resetOnSchemaChange: false,
-  });
-}
-
-export function useExerciseDatabase(skillId: string) {
-  return useDatabase({
-    context: 'exercise',
-    skillId,
     resetOnSchemaChange: true,
-    persistent: false,
   });
 }
 

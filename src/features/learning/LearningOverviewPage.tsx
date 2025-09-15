@@ -5,12 +5,8 @@ import {
   Box,
   Card,
   CardContent,
-  CardActions,
-  Button,
   CircularProgress,
   Alert,
-  Chip,
-  Divider,
   Tooltip,
   Switch,
   FormControlLabel,
@@ -180,9 +176,8 @@ export default function LearningOverviewPage() {
         key={item.id}
         ref={setNodeRef(item.id)}
         sx={{
-          width: '100%',
-          minWidth: 260,
-          maxWidth: 300,
+          width: 240,
+          flex: '0 0 240px',
           mb: 2,
           position: 'relative',
           zIndex: 1,
@@ -193,21 +188,33 @@ export default function LearningOverviewPage() {
           variant={completed ? 'outlined' : undefined}
           sx={{
             width: '100%',
+            height: 120,
+            display: 'flex',
+            flexDirection: 'column',
             border: '1px solid',
             borderColor: 'divider',
-            transition: 'transform 90ms cubic-bezier(.2,.7,.2,1), box-shadow 90ms cubic-bezier(.2,.7,.2,1), border-color 90ms cubic-bezier(.2,.7,.2,1), background-color 90ms cubic-bezier(.2,.7,.2,1)',
-            transform: 'translateZ(0)',
-            willChange: 'transform, box-shadow',
+            transition: 'box-shadow 90ms cubic-bezier(.2,.7,.2,1), border-color 90ms cubic-bezier(.2,.7,.2,1), background-color 90ms cubic-bezier(.2,.7,.2,1)',
             backgroundColor: 'background.paper',
+            cursor: 'pointer',
             '&:hover': {
               boxShadow: 4,
               borderColor: 'primary.light',
               backgroundColor: 'action.hover',
-              transform: 'translateZ(0) scale(1.02)',
             },
           }}
+          onClick={() => navigate(`/${type}/${item.id}`)}
+          onMouseEnter={() => {
+            if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current!);
+            setHoveredId(item.id);
+          }}
+          onMouseLeave={() => {
+            if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current!);
+            hoverTimerRef.current = window.setTimeout(() => setHoveredId(null), 60);
+          }}
+          role="button"
+          tabIndex={0}
         >
-        <CardContent sx={{ pb: 1 }}>
+        <CardContent sx={{ pb: 1, flexGrow: 1, minHeight: 0 }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
             <Icon fontSize="small" color={type === 'concept' ? 'action' : 'primary'} />
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -216,6 +223,7 @@ export default function LearningOverviewPage() {
                   variant="subtitle1"
                   component="h3"
                   sx={{ fontWeight: 600, color: completed ? 'text.secondary' : 'text.primary' }}
+                  noWrap
                 >
                   {item.name}
                 </Typography>
@@ -230,7 +238,7 @@ export default function LearningOverviewPage() {
                 )}
               </Box>
               {item.description && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {item.description}
                 </Typography>
               )}
@@ -239,27 +247,9 @@ export default function LearningOverviewPage() {
                   Progress: {progress}
                 </Typography>
               )}
-              {item.prerequisites?.length > 0 && (
-                <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {item.prerequisites.map(pr => (
-                    <Chip key={pr} size="small" label={pr} variant="outlined" />
-                  ))}
-                </Box>
-              )}
             </Box>
           </Box>
         </CardContent>
-        <CardActions sx={{ pt: 0 }}>
-          <Button
-            size="small"
-            variant={completed ? 'outlined' : 'contained'}
-            fullWidth
-            sx={{ textTransform: 'none', fontWeight: 600 }}
-            onClick={() => navigate(`/${type}/${item.id}`)}
-          >
-            {completed ? 'Review' : 'Start'}
-          </Button>
-        </CardActions>
         </Card>
       </Box>
     );
@@ -319,11 +309,7 @@ export default function LearningOverviewPage() {
       window.removeEventListener('resize', onResize);
       if (ro && containerRef.current) ro.unobserve(containerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentIndex, levels, components]);
-
-  // Note: We intentionally do not recompute on hover to keep
-  // connector positions stable while nodes animate.
 
   // Build quick lookup of prerequisites for ancestor tracing
   const prereqMap = useMemo(() => {

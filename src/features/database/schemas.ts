@@ -156,48 +156,12 @@ export const schemas = {
   employees: employeesSchema,
 };
 
-// Skill to schema mapping
-const skillSchemaMap: Record<string, keyof typeof schemas> = {
-  // Basic skills - single table
-  'filter-rows': 'companies',
-  'choose-columns': 'companies',
-  'sort-rows': 'companies',
-  'single-criterion-query': 'companies',
-  
-  // Skills that need positions table
-  'process-columns': 'positions',
-  'aggregate-columns': 'positions',
-  
-  // Skills that need multiple tables
-  'filter-rows-multiple': 'companiesAndPositions',
-  'join-tables': 'companiesAndPositions',
-  'multi-criterion-query': 'companiesAndPositions',
-  'multi-table-query': 'companiesAndPositions',
-  'filtered-aggregation': 'companiesAndPositions',
-  
-  // Advanced skills - complex schemas
-  'multi-layered-query': 'positions',
-  
-  // Add new skills here as needed
-};
-
-// Helper function to get schema by skill ID
-export function getSchemaForSkill(skillId: string): keyof typeof schemas {
-  return skillSchemaMap[skillId] || 'companies';
-}
-
 // Get all available table names for a schema
 export function getTableNames(schema: string): string[] {
   const matches = schema.match(/CREATE TABLE (\w+)/gi);
   if (!matches) return [];
   
   return matches.map(match => match.replace(/CREATE TABLE /i, '').trim());
-}
-
-// Helper to check if a skill requires multiple tables
-export function isMultiTableSkill(skillId: string): boolean {
-  const schema = getSchemaForSkill(skillId);
-  return schema === 'companiesAndPositions' || schema === 'employees';
 }
 
 // Helper to get a user-friendly schema description

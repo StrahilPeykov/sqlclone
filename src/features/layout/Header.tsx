@@ -15,7 +15,6 @@ export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const toggleSidebar = useAppStore((state) => state.toggleSidebar);
-  const currentComponent = useAppStore((state) => state.currentComponent);
   
   const isHome = location.pathname === '/';
   
@@ -92,20 +91,6 @@ export function Header() {
             );
           })}
         </Box>
-        
-        {/* Current Component Display */}
-        {currentComponent && (
-          <Typography
-            variant="body2"
-            sx={{
-              ml: 'auto',
-              color: 'text.secondary',
-              display: { xs: 'none', lg: 'block' },
-            }}
-          >
-            Current: {currentComponent}
-          </Typography>
-        )}
       </Toolbar>
     </AppBar>
   );

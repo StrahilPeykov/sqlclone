@@ -38,7 +38,7 @@ interface ExerciseInstance {
 export default function SkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState(0); // 0: Practice, 1: Theory
+  const [currentTab, setCurrentTab] = useState(0); // 0: Practice, 1: Theory, 2: Story
   
   // State management
   const [componentState, setComponentState] = useComponentState(skillId || '');
@@ -52,6 +52,7 @@ export default function SkillPage() {
     config?: { hints?: string[] };
   } | null>(null);
   const [skillTheory, setSkillTheory] = useState<string | null>(null);
+  const [skillStory, setSkillStory] = useState<string | null>(null);
   const [currentExercise, setCurrentExercise] = useState<ExerciseInstance | null>(null);
   const [query, setQuery] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -74,7 +75,6 @@ export default function SkillPage() {
     resetDatabase: resetExerciseDb,
   } = useDatabase({
     context: 'exercise',
-    skillId: skillId || '',
     schema: metaSchema,
     resetOnSchemaChange: true,
     persistent: false,
@@ -100,9 +100,10 @@ export default function SkillPage() {
         // Prefer folder-based content if available
         if (skill.contentPath) {
           try {
-            // Load theory + generator/validator code
-            const [theoryRes, codeRes, metaRes] = await Promise.all([
+            // Load theory + story + generator/validator code
+            const [theoryRes, storyRes, codeRes, metaRes] = await Promise.all([
               fetch(`/content/${skill.contentPath}/theory.mdx`).catch(() => null),
+              fetch(`/content/${skill.contentPath}/story.mdx`).catch(() => null),
               fetch(`/content/${skill.contentPath}/skill.ts`),
               fetch(`/content/${skill.contentPath}/meta.json`).catch(() => null),
             ]);
@@ -134,6 +135,11 @@ export default function SkillPage() {
             } else {
               setSkillTheory(null);
             }
+            if (storyRes && storyRes.ok) {
+              setSkillStory(await storyRes.text());
+            } else {
+              setSkillStory(null);
+            }
             setSkillContent(null);
             return;
           } catch (e) {
@@ -150,6 +156,7 @@ export default function SkillPage() {
         }
         setFolderSkill(null);
         setSkillTheory((library as any)?.theory ?? null);
+        setSkillStory(null);
         setSkillContent(library as SkillContent);
       } catch (err) {
         console.error('Failed to load skill content:', err);
@@ -176,14 +183,14 @@ export default function SkillPage() {
   // Restore saved tab
   useEffect(() => {
     if (componentState.tab) {
-      const tabIndex = ['practice', 'theory'].indexOf(componentState.tab as string);
+      const tabIndex = ['practice', 'theory', 'story'].indexOf(componentState.tab as string);
       if (tabIndex >= 0) setCurrentTab(tabIndex);
     }
   }, [componentState.tab]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
-    const tabNames = ['practice', 'theory'];
+    const tabNames = ['practice', 'theory', 'story'];
     setComponentState({ tab: tabNames[newValue] });
   };
 
@@ -253,7 +260,6 @@ export default function SkillPage() {
     try {
       // src is a full function string like "function generate(utils) { ... }"
       // Return the function instance
-      // eslint-disable-next-line no-new-func
       const fn = new Function(`return (${src});`)();
       return typeof fn === 'function' ? fn : null;
     } catch (e) {
@@ -265,7 +271,6 @@ export default function SkillPage() {
   const compileValidator = (src: string): ((input: string, state: any, result: any) => boolean) | null => {
     try {
       // src is a full function string like "function validate(input, state, result) { ... }"
-      // eslint-disable-next-line no-new-func
       const fn = new Function(`return (${src});`)();
       return typeof fn === 'function' ? fn : null;
     } catch (e) {
@@ -499,6 +504,7 @@ export default function SkillPage() {
         <Tabs value={currentTab} onChange={handleTabChange}>
           <Tab label="Practice" />
           <Tab label="Theory" />
+          <Tab label="Story" />
         </Tabs>
       </Box>
 
@@ -650,6 +656,22 @@ export default function SkillPage() {
               formatContent(skillTheory)
             ) : (
               <Typography variant="body1" color="text.secondary">Theory coming soon.</Typography>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Story */}
+      {currentTab === 2 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Story
+            </Typography>
+            {skillStory ? (
+              formatContent(skillStory)
+            ) : (
+              <Typography variant="body1" color="text.secondary">Story coming soon.</Typography>
             )}
           </CardContent>
         </Card>

@@ -187,7 +187,6 @@ export default function PlaygroundPage() {
             value={selectedSchema}
             onChange={(e) => handleSchemaChange(e.target.value as SchemaKey)}
             label="Database Schema"
-            disabled={!isReady}
           >
             {Object.keys(schemas).map(schema => (
               <MenuItem key={schema} value={schema}>

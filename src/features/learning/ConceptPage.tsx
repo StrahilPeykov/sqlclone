@@ -93,17 +93,19 @@ export default function ConceptPage() {
             const meta = await metaRes.json();
 
             // Load MDX files as plain text
-            const [theoryRes, quickRes] = await Promise.all([
+            const [theoryRes, quickRes, storyRes] = await Promise.all([
               fetch(`/content/${concept.contentPath}/full.mdx`),
               fetch(`/content/${concept.contentPath}/summary.mdx`),
+              fetch(`/content/${concept.contentPath}/story.mdx`).catch(() => null),
             ]);
-            const [theory, summary] = await Promise.all([
+            const [theory, summary, story] = await Promise.all([
               theoryRes.ok ? theoryRes.text() : Promise.resolve(''),
               quickRes.ok ? quickRes.text() : Promise.resolve(''),
+              storyRes && storyRes.ok ? storyRes.text() : Promise.resolve(''),
             ]);
 
             setConceptMeta({ ...concept, ...meta });
-            setConceptContent({ theory, summary });
+            setConceptContent({ theory, summary, story });
             setIsLoading(false);
             return;
           } catch (e) {
@@ -136,14 +138,14 @@ export default function ConceptPage() {
   // Restore saved tab
   useEffect(() => {
     if (componentState.tab) {
-      const tabIndex = ['theory', 'summary', 'examples'].indexOf(componentState.tab);
+      const tabIndex = ['theory', 'summary', 'examples', 'story'].indexOf(componentState.tab);
       if (tabIndex >= 0) setCurrentTab(tabIndex);
     }
   }, [componentState.tab]);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
-    const tabNames = ['theory', 'summary', 'examples'];
+    const tabNames = ['theory', 'summary', 'examples', 'story'];
     setComponentState({ tab: tabNames[newValue] });
   };
 
@@ -263,6 +265,7 @@ export default function ConceptPage() {
             <Tab label="Theory" icon={<Lightbulb />} iconPosition="start" />
             <Tab label="Summary" icon={<MenuBook />} iconPosition="start" />
             <Tab label="Examples" icon={<Code />} iconPosition="start" />
+            <Tab label="Story" icon={<MenuBook />} iconPosition="start" />
           </Tabs>
         </Box>
 
@@ -273,6 +276,17 @@ export default function ConceptPage() {
               formatContent(conceptContent.theory)
             ) : (
               <Typography variant="body1" color="text.secondary">Theory content coming soon.</Typography>
+            )}
+          </CardContent>
+        </TabPanel>
+
+        <TabPanel value={currentTab} index={3}>
+          <CardContent>
+            <Typography variant="h5" gutterBottom>Story</Typography>
+            {conceptContent?.story ? (
+              formatContent(conceptContent.story)
+            ) : (
+              <Typography variant="body1" color="text.secondary">Story coming soon.</Typography>
             )}
           </CardContent>
         </TabPanel>

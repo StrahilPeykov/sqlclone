@@ -20,7 +20,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* Path Aliases - simplified */
+    /* Path Aliases */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
