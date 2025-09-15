@@ -14,12 +14,13 @@ import {
   Tab,
   Paper,
 } from '@mui/material';
-import { PlayArrow, CheckCircle, ArrowBack, Refresh, ArrowForward } from '@mui/icons-material';
+import { PlayArrow, CheckCircle, ArrowBack, Refresh, ArrowForward, RestartAlt } from '@mui/icons-material';
 
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
 import { useComponentState } from '@/store';
-import { useExerciseDatabase } from '@/shared/hooks/useDatabase';
+import { useDatabase } from '@/shared/hooks/useDatabase';
+import type { SchemaKey } from '@/features/database/schemas';
 import { loadSkillsLibrary } from '@/features/content/contentIndex';
 import type { SkillContent, Exercise as ContentExercise } from '@/features/content/types';
 
@@ -61,7 +62,8 @@ export default function SkillPage() {
   const [skillMeta, setSkillMeta] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Database setup - using the new exercise database hook
+  // Database setup - allow meta-defined schema or fallback to skill mapping
+  const metaSchema = (skillMeta?.database as SchemaKey | undefined);
   const { 
     executeQuery, 
     queryResult, 
@@ -69,7 +71,14 @@ export default function SkillPage() {
     isReady: dbReady,
     isExecuting,
     tableNames,
-  } = useExerciseDatabase(skillId || '');
+    resetDatabase: resetExerciseDb,
+  } = useDatabase({
+    context: 'exercise',
+    skillId: skillId || '',
+    schema: metaSchema,
+    resetOnSchemaChange: true,
+    persistent: false,
+  });
   
   // Required exercises to mark skill as complete: cap by available exercises, default 3
   const requiredCount = folderSkill ? 3 : Math.min(3, skillContent?.exercises?.length ?? 3);
@@ -92,9 +101,10 @@ export default function SkillPage() {
         if (skill.contentPath) {
           try {
             // Load theory + generator/validator code
-            const [theoryRes, codeRes] = await Promise.all([
+            const [theoryRes, codeRes, metaRes] = await Promise.all([
               fetch(`/content/${skill.contentPath}/theory.mdx`).catch(() => null),
               fetch(`/content/${skill.contentPath}/skill.ts`),
+              fetch(`/content/${skill.contentPath}/meta.json`).catch(() => null),
             ]);
 
             if (!codeRes.ok) throw new Error('Missing skill.ts in folder');
@@ -110,6 +120,15 @@ export default function SkillPage() {
               solutionTemplate: typeof mod.solutionTemplate === 'string' ? mod.solutionTemplate : undefined,
               config: mod.config || {},
             });
+            if (metaRes && metaRes.ok) {
+              try {
+                const metaJson = await metaRes.json();
+                // Merge database or other fields from folder meta into skillMeta
+                setSkillMeta({ ...skill, ...metaJson });
+              } catch {
+                // ignore meta parse issues, keep index meta
+              }
+            }
             if (theoryRes && theoryRes.ok) {
               setSkillTheory(await theoryRes.text());
             } else {
@@ -146,6 +165,13 @@ export default function SkillPage() {
       setComponentState({ type: 'skill' });
     }
   }, [skillId, setComponentState, componentState.type]);
+
+  // Cleanup exercise database when leaving the page
+  useEffect(() => {
+    return () => {
+      resetExerciseDb();
+    };
+  }, [resetExerciseDb]);
 
   // Restore saved tab
   useEffect(() => {
@@ -381,6 +407,13 @@ export default function SkillPage() {
     }
   };
 
+  // Reset database without changing the exercise instance
+  const handleResetDatabase = () => {
+    resetExerciseDb();
+    setQuery('');
+    setFeedback({ message: 'Database reset - try again!', type: 'info' });
+  };
+
   // Autocomplete solution for the current exercise
   const handleAutoComplete = async () => {
     if (!currentExercise) return;
@@ -529,6 +562,15 @@ export default function SkillPage() {
               disabled={!currentExercise || isExecuting}
             >
               Auto-complete
+            </Button>
+            <Button
+              size="small"
+              startIcon={<RestartAlt />}
+              onClick={handleResetDatabase}
+              disabled={!dbReady || isExecuting}
+              title="Reset the current exercise database"
+            >
+              Reset Database
             </Button>
             {!exerciseCompleted ? (
               <Button

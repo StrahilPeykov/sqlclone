@@ -35,8 +35,8 @@ export async function getConceptDetails(id: string): Promise<any | null> {
     if (entry && entry.contentPath) {
       try {
         const [theoryRes, quickRes] = await Promise.all([
-          fetch(`/content/${entry.contentPath}/index.mdx`),
-          fetch(`/content/${entry.contentPath}/quick.mdx`),
+          fetch(`/content/${entry.contentPath}/full.mdx`),
+          fetch(`/content/${entry.contentPath}/summary.mdx`),
         ]);
         const [theory, summary] = await Promise.all([
           theoryRes.ok ? theoryRes.text() : Promise.resolve(''),

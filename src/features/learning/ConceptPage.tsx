@@ -94,8 +94,8 @@ export default function ConceptPage() {
 
             // Load MDX files as plain text
             const [theoryRes, quickRes] = await Promise.all([
-              fetch(`/content/${concept.contentPath}/index.mdx`),
-              fetch(`/content/${concept.contentPath}/quick.mdx`),
+              fetch(`/content/${concept.contentPath}/full.mdx`),
+              fetch(`/content/${concept.contentPath}/summary.mdx`),
             ]);
             const [theory, summary] = await Promise.all([
               theoryRes.ok ? theoryRes.text() : Promise.resolve(''),

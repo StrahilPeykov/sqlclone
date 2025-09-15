@@ -3,6 +3,6 @@
   "type": "skill",
   "name": "Use Filtered Aggregation",
   "description": "Apply WHERE and HAVING clauses with aggregation",
-  "prerequisites": ["aggregate-columns", "filter-rows-multiple", "process-columns"]
+  "prerequisites": ["aggregate-columns", "filter-rows-multiple", "process-columns"],
+  "database": "companiesAndPositions"
 }
-

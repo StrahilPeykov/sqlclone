@@ -3,6 +3,6 @@
   "type": "skill",
   "name": "Choose Columns",
   "description": "Select specific columns and rename them with aliases",
-  "prerequisites": ["sql"]
+  "prerequisites": ["sql"],
+  "database": "companies"
 }
-

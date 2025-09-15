@@ -36,7 +36,7 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
     persistent = false 
   } = options;
 
-  const { getDatabase, resetDatabase: resetContextDatabase, isReady: contextReady } = useDatabaseContext();
+  const { databases: contextDatabases, getDatabase, resetDatabase: resetContextDatabase, isReady: contextReady } = useDatabaseContext();
   
   const [currentSchema, setCurrentSchema] = useState<string>('');
   const [database, setDatabase] = useState<any>(null);
@@ -53,25 +53,26 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
     ? schemas[getSchemaForSkill(skillId)]
     : schemas.companies;
 
-  // Update database when schema changes or context is ready
+  // Update database when schema changes, provider DB instance changes, or context is ready
   useEffect(() => {
     if (!contextReady || !resolvedSchema) return;
 
     const schemaChanged = currentSchema !== resolvedSchema;
-    const needsInit = !database;
-    const shouldReset = resetOnSchemaChange && schemaChanged && !(context === 'playground' && persistent);
+    const providerDb = contextDatabases[context];
+    const shouldResetForSchema = resetOnSchemaChange && schemaChanged && !(context === 'playground' && persistent);
 
-    if (shouldReset || needsInit) {
-      if (shouldReset) {
-        resetContextDatabase(context);
-      }
+    if (shouldResetForSchema) {
+      // Reset provider and clear local reference
+      resetContextDatabase(context);
+      setDatabase(null);
+    }
 
+    // If provider has no DB for this context, create it
+    if (!providerDb) {
       const db = getDatabase(context, resolvedSchema);
       setDatabase(db);
       setCurrentSchema(resolvedSchema);
       setError(null);
-
-      // Update table names
       if (db) {
         try {
           const tables = db.exec(
@@ -87,6 +88,27 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
           setTableNames([]);
         }
       }
+      return;
+    }
+
+    // If provider DB exists but local ref differs, sync it and refresh table names
+    if (database !== providerDb || schemaChanged) {
+      setDatabase(providerDb);
+      setCurrentSchema(resolvedSchema);
+      setError(null);
+      try {
+        const tables = providerDb.exec(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+        );
+        if (tables[0]) {
+          setTableNames(tables[0].values.map((row: any[]) => row[0]));
+        } else {
+          setTableNames([]);
+        }
+      } catch (err) {
+        console.warn('Could not fetch table names:', err);
+        setTableNames([]);
+      }
     }
   }, [
     contextReady,
@@ -97,6 +119,7 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
     resetOnSchemaChange,
     getDatabase,
     resetContextDatabase,
+    contextDatabases,
     database,
   ]);
 
@@ -135,10 +158,11 @@ export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
   // Reset current database
   const resetDatabase = useCallback(() => {
     resetContextDatabase(context);
+    // Clear local ref so effect reinitializes a new DB instance
+    setDatabase(null);
     setQueryResult(null);
     setQueryError(null);
     setError(null);
-    // Database will be recreated in the next effect cycle
   }, [context, resetContextDatabase]);
 
   return {

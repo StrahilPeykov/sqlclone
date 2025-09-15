@@ -46,6 +46,13 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
   
   const [isReady, setIsReady] = useState(false);
 
+  // Track creation timestamps for cleanup policies
+  const createdAtRef = useRef<Record<DatabaseContextType, number | null>>({
+    playground: null,
+    exercise: null,
+    concept: null,
+  });
+
   // Initialize readiness when SQLJS is available
   useEffect(() => {
     setIsReady(!!SQLJS);
@@ -95,6 +102,8 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     if (!existingDb) {
       const newDb = createDatabase(schema, context);
       setDatabases(prev => ({ ...prev, [context]: newDb }));
+      // Record creation time for cleanup logic
+      createdAtRef.current[context] = newDb ? Date.now() : null;
       return newDb;
     }
 
@@ -113,6 +122,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     }
     
     setDatabases(prev => ({ ...prev, [context]: null }));
+    createdAtRef.current[context] = null;
   }, []);
 
   // Reset all databases
@@ -132,14 +142,67 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
       exercise: null,
       concept: null,
     });
+    createdAtRef.current = { playground: null, exercise: null, concept: null };
+  }, []);
+
+  // Reset only transient (non-persistent) databases: exercise + concept
+  const resetTransientDatabases = useCallback(() => {
+    (['exercise', 'concept'] as DatabaseContextType[]).forEach((ctx) => {
+      const db = databasesRef.current[ctx];
+      if (db && typeof db.close === 'function') {
+        try {
+          db.close();
+        } catch (error) {
+          console.warn(`Error closing ${ctx} database:`, error);
+        }
+      }
+      databasesRef.current[ctx] = null;
+      createdAtRef.current[ctx] = null;
+    });
+    setDatabases(prev => ({ ...prev, exercise: null, concept: null }));
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      resetAllDatabases();
+      // Keep playground persistent; cleanup transient DBs only
+      resetTransientDatabases();
     };
-  }, [resetAllDatabases]);
+  }, [resetTransientDatabases]);
+
+  // Auto-cleanup: exercise databases older than 30 minutes
+  useEffect(() => {
+    const CHECK_INTERVAL_MS = 60_000; // 1 minute
+    const MAX_AGE_MS = 30 * 60_000; // 30 minutes
+
+    const interval = setInterval(() => {
+      const createdAt = createdAtRef.current.exercise;
+      const db = databasesRef.current.exercise;
+      if (db && createdAt && Date.now() - createdAt > MAX_AGE_MS) {
+        try {
+          db.close?.();
+        } catch (error) {
+          console.warn('Error closing stale exercise database:', error);
+        }
+        databasesRef.current.exercise = null;
+        createdAtRef.current.exercise = null;
+        setDatabases(prev => ({ ...prev, exercise: null }));
+      }
+    }, CHECK_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Cleanup on tab visibility change (keep playground persistent)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        resetTransientDatabases();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [resetTransientDatabases]);
 
   const value: DatabaseContextValue = {
     databases,
