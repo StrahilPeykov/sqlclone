@@ -1,12 +1,10 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import {
   Container,
   Typography,
   Box,
   Card,
   CardContent,
-  CircularProgress,
-  Alert,
   Tooltip,
   Switch,
   FormControlLabel,
@@ -14,42 +12,16 @@ import {
 import { CheckCircle, PlayArrow, MenuBook, Build } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store';
-
-interface ComponentMeta {
-  id: string;
-  name: string;
-  type: 'concept' | 'skill';
-  description?: string;
-  prerequisites: string[];
-}
+import { contentIndex as learningContentIndex, type ContentMeta } from './content';
+type ComponentMeta = ContentMeta;
 
 export default function LearningOverviewPage() {
   const navigate = useNavigate();
   const components = useAppStore(state => state.components);
-  
-  const [contentIndex, setContentIndex] = useState<ComponentMeta[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Load content index
-  useEffect(() => {
-    fetch('/content/index.json')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to load content');
-        return res.json();
-      })
-      .then(data => {
-        setContentIndex(data);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setIsLoading(false);
-      });
-  }, []);
-
-  const concepts = useMemo(() => contentIndex.filter(item => item.type === 'concept'), [contentIndex]);
-  const skills = useMemo(() => contentIndex.filter(item => item.type === 'skill'), [contentIndex]);
+  const contentItems = useMemo(() => learningContentIndex, []);
+  const concepts = useMemo(() => contentItems.filter(item => item.type === 'concept'), [contentItems]);
+  const skills = useMemo(() => contentItems.filter(item => item.type === 'skill'), [contentItems]);
 
   const isCompleted = (id: string) => {
     const component = components[id];
@@ -79,7 +51,7 @@ export default function LearningOverviewPage() {
   // Compute hierarchical levels for a simple skill tree layout
   const levels = useMemo(() => {
     const byId = new Map<string, ComponentMeta>();
-    for (const item of contentIndex) byId.set(item.id, item);
+    for (const item of contentItems) byId.set(item.id, item);
 
     const memo = new Map<string, number>();
     const visiting = new Set<string>();
@@ -109,7 +81,7 @@ export default function LearningOverviewPage() {
     };
 
     const grouped = new Map<number, ComponentMeta[]>();
-    for (const item of contentIndex) {
+    for (const item of contentItems) {
       const lvl = levelOf(item.id);
       if (!grouped.has(lvl)) grouped.set(lvl, []);
       grouped.get(lvl)!.push(item);
@@ -152,7 +124,7 @@ export default function LearningOverviewPage() {
     }
 
     return columns;
-  }, [contentIndex]);
+  }, [contentItems]);
 
   // Refs to nodes and container for measuring connectors
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -264,9 +236,9 @@ export default function LearningOverviewPage() {
     const cRect = container.getBoundingClientRect();
 
     const newPaths: { d: string; from: string; to: string }[] = [];
-    const byId = new Set(contentIndex.map(i => i.id));
+    const byId = new Set(contentItems.map(i => i.id));
 
-    for (const item of contentIndex) {
+    for (const item of contentItems) {
       for (const pre of item.prerequisites || []) {
         if (!byId.has(pre)) continue;
         const fromEl = nodeRefs.current.get(pre);
@@ -309,14 +281,14 @@ export default function LearningOverviewPage() {
       window.removeEventListener('resize', onResize);
       if (ro && containerRef.current) ro.unobserve(containerRef.current);
     };
-  }, [contentIndex, levels, components]);
+  }, [contentItems, levels, components]);
 
   // Build quick lookup of prerequisites for ancestor tracing
   const prereqMap = useMemo(() => {
     const m = new Map<string, string[]>();
-    for (const item of contentIndex) m.set(item.id, item.prerequisites || []);
+    for (const item of contentItems) m.set(item.id, item.prerequisites || []);
     return m;
-  }, [contentIndex]);
+  }, [contentItems]);
 
   const visiblePaths = useMemo(() => {
     if (showAll) return paths;
@@ -334,24 +306,6 @@ export default function LearningOverviewPage() {
     // Only show edges that point to a node in the ancestor closure
     return paths.filter(p => ancestors.has(p.to));
   }, [paths, showAll, hoveredId, prereqMap]);
-
-  if (isLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">
-          Failed to load content: {error}
-        </Alert>
-      </Container>
-    );
-  }
 
   const completedConcepts = concepts.filter(c => isCompleted(c.id)).length;
   const completedSkills = skills.filter(s => isCompleted(s.id)).length;

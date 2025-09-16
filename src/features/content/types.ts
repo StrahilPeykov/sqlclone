@@ -23,13 +23,10 @@ export const ConceptContentSchema = z.object({
 export const ExerciseSchema = z.object({
   id: z.string(),
   version: z.number(),
-  points: z.number().default(10),
   
   // Exercise configuration
   config: z.object({
     database: z.string().optional(),
-    timeLimit: z.number().optional(), // in seconds
-    hints: z.array(z.string()).optional(),
   }),
   
   // Generation function (stored as string, evaluated at runtime)

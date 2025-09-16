@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -12,7 +12,6 @@ import {
   CircularProgress,
   Tabs,
   Tab,
-  Paper,
 } from '@mui/material';
 import { PlayArrow, CheckCircle, ArrowBack, Refresh, ArrowForward, RestartAlt } from '@mui/icons-material';
 
@@ -21,19 +20,21 @@ import { DataTable } from '@/shared/components/DataTable';
 import { useComponentState } from '@/store';
 import { useDatabase } from '@/shared/hooks/useDatabase';
 import type { SchemaKey } from '@/features/database/schemas';
-import { loadSkillsLibrary } from '@/features/content/contentIndex';
-import type { SkillContent, Exercise as ContentExercise } from '@/features/content/types';
+import { contentIndex, type ContentMeta, skillExerciseLoaders } from './content';
+import { useContent } from './hooks/useContent';
 
 interface ExerciseInstance {
   id: string;
   description: string;
-  points: number;
   expectedQuery?: string;
   validatorFn?: (input: string, state: any, result: any) => boolean;
   solutionTemplate?: string;
-  config: { database?: string; hints?: string[] };
+  config?: { database?: string };
   state: any; // generated state from generator
 }
+
+type SkillExerciseLoader = (typeof skillExerciseLoaders)[keyof typeof skillExerciseLoaders];
+type SkillExerciseModule = Awaited<ReturnType<SkillExerciseLoader>>;
 
 export default function SkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
@@ -44,23 +45,18 @@ export default function SkillPage() {
   const [componentState, setComponentState] = useComponentState(skillId || '');
   
   // Skill content + exercise state
-  const [skillContent, setSkillContent] = useState<SkillContent | null>(null);
-  const [folderSkill, setFolderSkill] = useState<{
+  const [skillModule, setSkillModule] = useState<{
     generate?: (utils: any) => any;
     validate?: (input: string, state: any, result: any) => boolean;
     solutionTemplate?: string;
-    config?: { hints?: string[] };
   } | null>(null);
-  const [skillTheory, setSkillTheory] = useState<string | null>(null);
-  const [skillStory, setSkillStory] = useState<string | null>(null);
   const [currentExercise, setCurrentExercise] = useState<ExerciseInstance | null>(null);
   const [query, setQuery] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [showHint, setShowHint] = useState(false);
   const [exerciseCompleted, setExerciseCompleted] = useState(false);
   
   // Skill metadata
-  const [skillMeta, setSkillMeta] = useState<any>(null);
+  const [skillMeta, setSkillMeta] = useState<(ContentMeta & { database?: SchemaKey }) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Database setup - allow meta-defined schema or fallback to skill mapping
@@ -80,98 +76,62 @@ export default function SkillPage() {
     persistent: false,
   });
   
-  // Required exercises to mark skill as complete: cap by available exercises, default 3
-  const requiredCount = folderSkill ? 3 : Math.min(3, skillContent?.exercises?.length ?? 3);
+  // Required exercises to mark skill as complete
+  const requiredCount = 3;
   const isCompleted = (componentState.numSolved || 0) >= requiredCount;
 
-  // Load skill metadata + content library
   useEffect(() => {
     if (!skillId) return;
 
-    const load = async () => {
-      try {
-        setIsLoading(true);
-        const indexRes = await fetch('/content/index.json').then(r => r.json());
-        const skill = indexRes.find((c: any) => c.id === skillId);
+    let cancelled = false;
+    setIsLoading(true);
 
-        if (!skill) throw new Error('Skill not found');
-        setSkillMeta(skill);
+    const entry = contentIndex.find(item => item.type === 'skill' && item.id === skillId) || null;
+    setSkillMeta(entry);
+    setCurrentExercise(null);
 
-        // Prefer folder-based content if available
-        if (skill.contentPath) {
-          try {
-            // Load theory + story + generator/validator code
-            const [theoryRes, storyRes, codeRes, metaRes] = await Promise.all([
-              fetch(`/content/${skill.contentPath}/theory.mdx`).catch(() => null),
-              fetch(`/content/${skill.contentPath}/story.mdx`).catch(() => null),
-              fetch(`/content/${skill.contentPath}/skill.ts`),
-              fetch(`/content/${skill.contentPath}/meta.json`).catch(() => null),
-            ]);
+    if (!entry) {
+      setSkillModule(null);
+      setIsLoading(false);
+      return;
+    }
 
-            if (!codeRes.ok) throw new Error('Missing skill.ts in folder');
-            const codeText = await codeRes.text();
-            const transformed = codeText.replace(/^export\s+/gm, '');
-            const factory = new Function(
-              `${transformed}; return { generate, validate, config, solutionTemplate };`
-            );
-            const mod = factory();
-            setFolderSkill({
-              generate: typeof mod.generate === 'function' ? mod.generate : undefined,
-              validate: typeof mod.validate === 'function' ? mod.validate : undefined,
-              solutionTemplate: typeof mod.solutionTemplate === 'string' ? mod.solutionTemplate : undefined,
-              config: mod.config || {},
-            });
-            if (metaRes && metaRes.ok) {
-              try {
-                const metaJson = await metaRes.json();
-                // Merge database or other fields from folder meta into skillMeta
-                setSkillMeta({ ...skill, ...metaJson });
-              } catch {
-                // ignore meta parse issues, keep index meta
-              }
-            }
-            if (theoryRes && theoryRes.ok) {
-              setSkillTheory(await theoryRes.text());
-            } else {
-              setSkillTheory(null);
-            }
-            if (storyRes && storyRes.ok) {
-              setSkillStory(await storyRes.text());
-            } else {
-              setSkillStory(null);
-            }
-            setSkillContent(null);
-            return;
-          } catch (e) {
-            console.warn('Failed to load folder-based skill; falling back to JSON library.', e);
-          }
-        }
+    const loader = (skillId in skillExerciseLoaders)
+      ? skillExerciseLoaders[skillId as keyof typeof skillExerciseLoaders]
+      : undefined;
+    if (!loader) {
+      setSkillModule(null);
+      setIsLoading(false);
+      return;
+    }
 
-        // Fallback to legacy JSON
-        let library: SkillContent | null = null;
-        try {
-          library = await fetch(`/content/skills/${skillId}.json`).then(r => r.ok ? r.json() : Promise.reject(new Error('no specific skill file')));
-        } catch {
-          library = await loadSkillsLibrary();
-        }
-        setFolderSkill(null);
-        setSkillTheory((library as any)?.theory ?? null);
-        setSkillStory(null);
-        setSkillContent(library as SkillContent);
-      } catch (err) {
+    loader()
+      .then((mod: SkillExerciseModule) => {
+        if (cancelled) return;
+        setSkillModule({
+          generate: typeof mod.generate === 'function' ? mod.generate : undefined,
+          validate: typeof mod.validate === 'function' ? mod.validate : undefined,
+          solutionTemplate: typeof mod.solutionTemplate === 'string' ? mod.solutionTemplate : undefined,
+        });
+      })
+      .catch((err: unknown) => {
         console.error('Failed to load skill content:', err);
-      } finally {
-        setIsLoading(false);
-      }
+        if (!cancelled) setSkillModule(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
+  }, [skillId]);
 
-    load();
-
-    // Update component type
+  useEffect(() => {
     if (componentState.type !== 'skill') {
       setComponentState({ type: 'skill' });
     }
-  }, [skillId, setComponentState, componentState.type]);
+  }, [componentState.type, setComponentState]);
 
   // Cleanup exercise database when leaving the page
   useEffect(() => {
@@ -194,60 +154,6 @@ export default function SkillPage() {
     setComponentState({ tab: tabNames[newValue] });
   };
 
-  const formatContent = (content: string) => {
-    if (!content) return null;
-    const lines = content.trim().split('\n');
-    let inCode = false;
-    const chunks: any[] = [];
-    let codeBuffer: string[] = [];
-
-    lines.forEach((line, index) => {
-      if (line.trim().startsWith('```')) {
-        if (!inCode) {
-          inCode = true;
-          codeBuffer = [];
-        } else {
-          chunks.push(
-            <Paper key={`code-${index}`} sx={{ p: 1, bgcolor: 'action.hover', overflow: 'auto' }}>
-              <pre style={{ margin: 0 }}>
-                <code>{codeBuffer.join('\n')}</code>
-              </pre>
-            </Paper>
-          );
-          inCode = false;
-          codeBuffer = [];
-        }
-        return;
-      }
-      if (inCode) {
-        codeBuffer.push(line);
-        return;
-      }
-      if (line.startsWith('## ')) {
-        chunks.push(
-          <Typography key={`h-${index}`} variant="h6" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-            {line.replace('## ', '')}
-          </Typography>
-        );
-      } else if (line.startsWith('- **')) {
-        const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-        chunks.push(
-          <Typography key={`li-${index}`} variant="body1" sx={{ ml: 2, mb: 0.5 }}>
-            {match ? (<><strong>{match[1]}</strong>: {match[2]}</>) : line}
-          </Typography>
-        );
-      } else if (line.trim() === '') {
-        chunks.push(<br key={`br-${index}`} />);
-      } else {
-        chunks.push(
-          <Typography key={`p-${index}`} variant="body1" paragraph>
-            {line}
-          </Typography>
-        );
-      }
-    });
-    return chunks;
-  };
 
   // Utilities available to content generators
   const genUtils = {
@@ -256,80 +162,44 @@ export default function SkillPage() {
       Math.floor(Math.random() * (max - min + 1)) + min,
   };
 
-  const compileGenerator = (src: string): ((utils: typeof genUtils) => any) | null => {
-    try {
-      // src is a full function string like "function generate(utils) { ... }"
-      // Return the function instance
-      const fn = new Function(`return (${src});`)();
-      return typeof fn === 'function' ? fn : null;
-    } catch (e) {
-      console.error('Failed to compile generator:', e);
-      return null;
-    }
-  };
-
-  const compileValidator = (src: string): ((input: string, state: any, result: any) => boolean) | null => {
-    try {
-      // src is a full function string like "function validate(input, state, result) { ... }"
-      const fn = new Function(`return (${src});`)();
-      return typeof fn === 'function' ? fn : null;
-    } catch (e) {
-      console.error('Failed to compile validator:', e);
-      return null;
-    }
-  };
-
   // Generate a new exercise
   const generateExercise = useCallback(() => {
-    if (folderSkill && folderSkill.generate) {
-      const state = folderSkill.generate(genUtils) || {};
-      const instance: ExerciseInstance = {
-        id: state?.id || 'exercise',
-        description: state?.description || 'Solve the exercise',
-        points: 10,
-        expectedQuery: state?.expectedQuery,
-        validatorFn: folderSkill.validate,
-        solutionTemplate: folderSkill.solutionTemplate,
-        config: { hints: folderSkill.config?.hints },
-        state,
-      };
-      setCurrentExercise(instance);
-    } else {
-      if (!skillContent?.exercises || skillContent.exercises.length === 0) return;
-
-      // Get exercise history to avoid repeats
-      const history = componentState.exerciseHistory || [];
-      const lastExerciseIds = history.slice(-2).map((h: any) => h?.id);
-
-      const pool: ContentExercise[] = skillContent.exercises.filter(
-        (ex) => !lastExerciseIds.includes(ex.id)
-      );
-      const choiceList = pool.length > 0 ? pool : skillContent.exercises;
-      const base = choiceList[Math.floor(Math.random() * choiceList.length)];
-
-      // Compile and run generator
-      const gen = compileGenerator(base.generator);
-      const state = gen ? gen(genUtils) : {};
-
-      // Prepare instance
-      const validatorFn = base.validator ? compileValidator(base.validator) : null;
-      const instance: ExerciseInstance = {
-        id: base.id,
-        description: state?.description || base.id,
-        points: base.points ?? 10,
-        expectedQuery: state?.expectedQuery,
-        validatorFn: validatorFn || undefined,
-        solutionTemplate: base.solutionTemplate,
-        config: { database: base.config?.database, hints: base.config?.hints },
-        state,
-      };
-      setCurrentExercise(instance);
+    if (!skillModule?.generate) {
+      return;
     }
+
+    const state = skillModule.generate(genUtils) || {};
+    const instance: ExerciseInstance = {
+      id: state?.id || 'exercise',
+      description: state?.description || 'Solve the exercise',
+      expectedQuery: state?.expectedQuery,
+      validatorFn: skillModule.validate,
+      solutionTemplate: skillModule.solutionTemplate,
+      config: {},
+      state,
+    };
+    setCurrentExercise(instance);
     setQuery('');
     setFeedback(null);
-    setShowHint(false);
     setExerciseCompleted(false);
-  }, [skillContent, componentState.exerciseHistory, genUtils, folderSkill]);
+  }, [skillModule, genUtils]);
+
+  const TheoryContent = useContent(skillMeta?.id, 'Theory');
+  const StoryContent = useContent(skillMeta?.id, 'Story');
+
+  const renderContent = (
+    Component: ReturnType<typeof useContent>,
+    emptyMessage: string,
+  ) => {
+    if (!Component) {
+      return <Typography variant="body1" color="text.secondary">{emptyMessage}</Typography>;
+    }
+    return (
+      <Suspense fallback={<Typography variant="body1" color="text.secondary">Loading content…</Typography>}>
+        <Component />
+      </Suspense>
+    );
+  };
 
   // Initialize first exercise when DB ready
   useEffect(() => {
@@ -449,17 +319,7 @@ export default function SkillPage() {
     generateExercise();
   };
 
-  // Show hint
-  const handleShowHint = () => {
-    setShowHint(true);
-    const hint = currentExercise?.config?.hints?.[0];
-    if (hint) {
-      setFeedback({
-        message: `Hint: ${hint}`,
-        type: 'info'
-      });
-    }
-  };
+  // Hints removed
 
   if (isLoading) {
     return (
@@ -554,13 +414,7 @@ export default function SkillPage() {
             Write your SQL query:
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              size="small"
-              onClick={handleShowHint}
-              disabled={showHint || !(currentExercise?.config?.hints && currentExercise.config.hints.length > 0)}
-            >
-              Show Hint
-            </Button>
+            {/* Hint feature removed */}
             <Button
               size="small"
               onClick={handleAutoComplete}
@@ -652,11 +506,7 @@ export default function SkillPage() {
             <Typography variant="h6" gutterBottom>
               Theory
             </Typography>
-            {skillTheory ? (
-              formatContent(skillTheory)
-            ) : (
-              <Typography variant="body1" color="text.secondary">Theory coming soon.</Typography>
-            )}
+            {renderContent(TheoryContent, 'Theory coming soon.')}
           </CardContent>
         </Card>
       )}
@@ -668,11 +518,7 @@ export default function SkillPage() {
             <Typography variant="h6" gutterBottom>
               Story
             </Typography>
-            {skillStory ? (
-              formatContent(skillStory)
-            ) : (
-              <Typography variant="body1" color="text.secondary">Story coming soon.</Typography>
-            )}
+            {renderContent(StoryContent, 'Story coming soon.')}
           </CardContent>
         </Card>
       )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Drawer,
   List,
@@ -11,8 +11,6 @@ import {
   Divider,
   Typography,
   Chip,
-  CircularProgress,
-  Alert,
 } from '@mui/material';
 import {
   ExpandLess,
@@ -24,18 +22,13 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store';
+import { contentIndex as learningContentIndex, type ContentMeta } from '@/features/learning/content';
 
 interface SidebarProps {
   open: boolean;
 }
 
-interface ComponentMeta {
-  id: string;
-  name: string;
-  type: 'concept' | 'skill';
-  description?: string;
-  prerequisites: string[];
-}
+type ComponentMeta = ContentMeta;
 
 export function Sidebar({ open }: SidebarProps) {
   const navigate = useNavigate();
@@ -47,33 +40,14 @@ export function Sidebar({ open }: SidebarProps) {
     skills: true,
   });
   
-  const [contentIndex, setContentIndex] = useState<ComponentMeta[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const contentItems = useMemo(() => learningContentIndex, []);
 
-  // Load content index
-  useEffect(() => {
-    fetch('/content/index.json')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to load content');
-        return res.json();
-      })
-      .then(data => {
-        setContentIndex(data);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setIsLoading(false);
-      });
-  }, []);
-  
   // Group components by type
   const groupedComponents = useMemo(() => {
-    const concepts = contentIndex.filter((c) => c.type === 'concept');
-    const skills = contentIndex.filter((c) => c.type === 'skill');
+    const concepts = contentItems.filter((c) => c.type === 'concept');
+    const skills = contentItems.filter((c) => c.type === 'skill');
     return { concepts, skills };
-  }, [contentIndex]);
+  }, [contentItems]);
   
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -115,60 +89,6 @@ export function Sidebar({ open }: SidebarProps) {
     const path = location.pathname;
     return path.includes(`/${component.type}/${component.id}`);
   };
-  
-  // Loading state
-  if (isLoading && open) {
-    return (
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: open ? 240 : 72,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: open ? 240 : 72,
-            boxSizing: 'border-box',
-            top: 64,
-            transition: 'width 0.3s',
-            overflowX: 'hidden',
-            bgcolor: 'background.paper',
-            borderRight: 1,
-            borderColor: 'divider',
-          },
-        }}
-      >
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-          <CircularProgress size={24} />
-        </Box>
-      </Drawer>
-    );
-  }
-  
-  // Error state
-  if (error && open) {
-    return (
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: open ? 240 : 72,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: open ? 240 : 72,
-            boxSizing: 'border-box',
-            top: 64,
-            transition: 'width 0.3s',
-            overflowX: 'hidden',
-            bgcolor: 'background.paper',
-            borderRight: 1,
-            borderColor: 'divider',
-          },
-        }}
-      >
-        <Alert severity="error" sx={{ m: 2 }}>
-          {error}
-        </Alert>
-      </Drawer>
-    );
-  }
   
   const completedConcepts = groupedComponents.concepts.filter(c => isCompleted(c)).length;
   const completedSkills = groupedComponents.skills.filter(s => isCompleted(s)).length;

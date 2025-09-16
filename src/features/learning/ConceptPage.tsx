@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Suspense, useMemo, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -10,7 +10,6 @@ import {
   Tabs,
   Tab,
   Alert,
-  CircularProgress,
   Paper,
 } from '@mui/material';
 import {
@@ -26,6 +25,8 @@ import { useComponentState } from '@/store';
 import { useConceptDatabase } from '@/shared/hooks/useDatabase';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
+import { contentIndex, type ContentMeta } from './content';
+import { useContent } from './hooks/useContent';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -69,71 +70,16 @@ export default function ConceptPage() {
   // Demo query state for interactive examples
   const [demoQuery, setDemoQuery] = useState('SELECT * FROM companies LIMIT 5;');
   
-  // Load concept metadata
-  const [conceptMeta, setConceptMeta] = useState<any>(null);
-  const [conceptContent, setConceptContent] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const conceptMeta = useMemo<ContentMeta | undefined>(() => {
+    if (!conceptId) return undefined;
+    return contentIndex.find(item => item.type === 'concept' && item.id === conceptId);
+  }, [conceptId]);
 
   useEffect(() => {
-    if (!conceptId) return;
-
-    const load = async () => {
-      try {
-        // Load metadata from index
-        const indexRes = await fetch('/content/index.json');
-        const indexData = await indexRes.json();
-        const concept = indexData.find((c: any) => c.id === conceptId);
-        if (!concept) throw new Error('Concept not found');
-
-        // If a folder-based content path exists, load from there
-        if (concept.contentPath) {
-          try {
-            const metaRes = await fetch(`/content/${concept.contentPath}/meta.json`);
-            const meta = await metaRes.json();
-
-            // Load MDX files as plain text
-            const [theoryRes, quickRes, storyRes] = await Promise.all([
-              fetch(`/content/${concept.contentPath}/full.mdx`),
-              fetch(`/content/${concept.contentPath}/summary.mdx`),
-              fetch(`/content/${concept.contentPath}/story.mdx`).catch(() => null),
-            ]);
-            const [theory, summary, story] = await Promise.all([
-              theoryRes.ok ? theoryRes.text() : Promise.resolve(''),
-              quickRes.ok ? quickRes.text() : Promise.resolve(''),
-              storyRes && storyRes.ok ? storyRes.text() : Promise.resolve(''),
-            ]);
-
-            setConceptMeta({ ...concept, ...meta });
-            setConceptContent({ theory, summary, story });
-            setIsLoading(false);
-            return;
-          } catch (e) {
-            // Fall back to legacy JSON below
-            console.warn('Folder-based content missing, falling back to legacy JSON.', e);
-          }
-        }
-
-        // Legacy JSON fallback
-        const legacyRes = await fetch(`/content/concepts/${conceptId}.json`);
-        const legacyContent = await legacyRes.json();
-        setConceptMeta(concept);
-        setConceptContent(legacyContent);
-        setIsLoading(false);
-      } catch (err: any) {
-        console.error('Failed to load concept:', err);
-        setError(err.message || 'Failed to load concept');
-        setIsLoading(false);
-      }
-    };
-
-    load();
-
-    // Update last accessed
     if (componentState.type !== 'concept') {
       setComponentState({ type: 'concept' });
     }
-  }, [conceptId, setComponentState, componentState.type]);
+  }, [componentState.type, setComponentState]);
 
   // Restore saved tab
   useEffect(() => {
@@ -158,19 +104,11 @@ export default function ConceptPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
-
-  if (error || !conceptMeta) {
+  if (!conceptMeta) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error">
-          {error || 'Concept not found'}
+          Concept not found
           <Button onClick={() => navigate('/learn')}>Return to learning</Button>
         </Alert>
       </Container>
@@ -183,26 +121,22 @@ export default function ConceptPage() {
     setComponentState({ understood: true });
   };
 
-  const formatContent = (content: string) => {
-    if (!content) return null;
-    
-    const lines = content.trim().split('\n');
-    return lines.map((line, index) => {
-      if (line.startsWith('## ')) {
-        return <Typography key={index} variant="h6" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>{line.replace('## ', '')}</Typography>;
-      } else if (line.startsWith('- **')) {
-        const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-        return match ? (
-          <Typography key={index} variant="body1" sx={{ ml: 2, mb: 0.5 }}>
-            • <strong>{match[1]}</strong>: {match[2]}
-          </Typography>
-        ) : <Typography key={index} variant="body1" sx={{ ml: 2 }}>{line}</Typography>;
-      } else if (line.trim() === '') {
-        return <br key={index} />;
-      } else {
-        return <Typography key={index} variant="body1" paragraph>{line}</Typography>;
-      }
-    });
+  const TheoryContent = useContent(conceptMeta?.id, 'Theory');
+  const SummaryContent = useContent(conceptMeta?.id, 'Summary');
+  const StoryContent = useContent(conceptMeta?.id, 'Story');
+
+  const renderContent = (
+    Component: ReturnType<typeof useContent>,
+    emptyMessage: string,
+  ) => {
+    if (!Component) {
+      return <Typography variant="body1" color="text.secondary">{emptyMessage}</Typography>;
+    }
+    return (
+      <Suspense fallback={<Typography variant="body1" color="text.secondary">Loading content…</Typography>}>
+        <Component />
+      </Suspense>
+    );
   };
 
   // Demo queries based on concept
@@ -272,45 +206,21 @@ export default function ConceptPage() {
         <TabPanel value={currentTab} index={0}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Theory</Typography>
-            {conceptContent?.theory ? (
-              formatContent(conceptContent.theory)
-            ) : (
-              <Typography variant="body1" color="text.secondary">Theory content coming soon.</Typography>
-            )}
+            {renderContent(TheoryContent, 'Theory content coming soon.')}
           </CardContent>
         </TabPanel>
 
         <TabPanel value={currentTab} index={3}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Story</Typography>
-            {conceptContent?.story ? (
-              formatContent(conceptContent.story)
-            ) : (
-              <Typography variant="body1" color="text.secondary">Story coming soon.</Typography>
-            )}
+            {renderContent(StoryContent, 'Story coming soon.')}
           </CardContent>
         </TabPanel>
 
         <TabPanel value={currentTab} index={1}>
           <CardContent>
             <Typography variant="h5" gutterBottom>Summary</Typography>
-            {conceptContent?.summary ? (
-              formatContent(conceptContent.summary)
-            ) : (
-              <Typography variant="body1" color="text.secondary">Summary coming soon.</Typography>
-            )}
-            
-            {conceptContent?.examples && conceptContent.examples.length > 0 && (
-              <>
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>Key Examples</Typography>
-                {conceptContent.examples.map((example: any, index: number) => (
-                  <Box key={index} sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                    <Typography variant="subtitle2" gutterBottom>{example.title}</Typography>
-                    <Typography variant="body2">{example.content}</Typography>
-                  </Box>
-                ))}
-              </>
-            )}
+            {renderContent(SummaryContent, 'Summary coming soon.')}
           </CardContent>
         </TabPanel>
 
