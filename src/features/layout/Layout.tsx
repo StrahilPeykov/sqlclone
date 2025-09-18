@@ -22,13 +22,13 @@ import { ColorModeContext } from '@/theme';
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const navItems = [
     { path: '/', label: 'Home', icon: HomeIcon },
     { path: '/learn', label: 'Learn', icon: LearnIcon },
     { path: '/playground', label: 'Playground', icon: PlaygroundIcon },
   ];
-  
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Header */}
@@ -50,14 +50,14 @@ export function Layout() {
             >
               SQL Valley
             </Typography>
-            
+
             {/* Navigation */}
             <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.path || 
-                                (item.path !== '/' && location.pathname.startsWith(item.path));
-                
+                const isActive = location.pathname === item.path ||
+                  (item.path !== '/' && location.pathname.startsWith(item.path));
+
                 return (
                   <Button
                     key={item.path}
@@ -85,7 +85,7 @@ export function Layout() {
           </Toolbar>
         </Container>
       </AppBar>
-      
+
       {/* Main Content */}
       <Box
         component="main"

@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useEffect, useState } from 'react';
+﻿import { Suspense, useMemo, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -25,7 +25,7 @@ import { useComponentState } from '@/store';
 import { useConceptDatabase } from '@/shared/hooks/useDatabase';
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
-import { contentIndex, type ContentMeta } from './content';
+import { contentIndex, type ContentMeta } from '@/features/content';
 import { useContent } from './hooks/useContent';
 
 interface TabPanelProps {
@@ -54,22 +54,22 @@ export default function ConceptPage() {
   const { conceptId } = useParams<{ conceptId: string }>();
   const navigate = useNavigate();
   const [currentTab, setCurrentTab] = useState(0);
-  
+
   // Use new store
   const [componentState, setComponentState] = useComponentState(conceptId || '');
-  
+
   // Database for concept demonstrations
-  const { 
-    executeQuery, 
-    queryResult, 
-    queryError, 
+  const {
+    executeQuery,
+    queryResult,
+    queryError,
     isExecuting,
-    tableNames 
+    tableNames
   } = useConceptDatabase('companies');
-  
+
   // Demo query state for interactive examples
   const [demoQuery, setDemoQuery] = useState('SELECT * FROM companies LIMIT 5;');
-  
+
   const conceptMeta = useMemo<ContentMeta | undefined>(() => {
     if (!conceptId) return undefined;
     return contentIndex.find(item => item.type === 'concept' && item.id === conceptId);
@@ -81,13 +81,17 @@ export default function ConceptPage() {
     }
   }, [componentState.type, setComponentState]);
 
-  // Restore saved tab
+  // Restore saved tab or default to theory (index 0)
   useEffect(() => {
     if (componentState.tab) {
       const tabIndex = ['theory', 'summary', 'examples', 'story'].indexOf(componentState.tab);
       if (tabIndex >= 0) setCurrentTab(tabIndex);
+    } else {
+      // Default to theory tab and save it
+      setCurrentTab(0);
+      setComponentState({ tab: 'theory' });
     }
-  }, [componentState.tab]);
+  }, [componentState.tab, setComponentState]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
@@ -133,7 +137,7 @@ export default function ConceptPage() {
       return <Typography variant="body1" color="text.secondary">{emptyMessage}</Typography>;
     }
     return (
-      <Suspense fallback={<Typography variant="body1" color="text.secondary">Loading content…</Typography>}>
+      <Suspense fallback={<Typography variant="body1" color="text.secondary">Loading content...</Typography>}>
         <Component />
       </Suspense>
     );
@@ -164,8 +168,8 @@ export default function ConceptPage() {
     <Container maxWidth="lg" sx={{ py: 2 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Button 
-          startIcon={<ArrowBack />} 
+        <Button
+          startIcon={<ArrowBack />}
           onClick={() => navigate('/learn')}
           sx={{ mr: 2 }}
         >
@@ -305,7 +309,7 @@ export default function ConceptPage() {
       {/* Action Buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
         <div />
-        
+
         <Box sx={{ display: 'flex', gap: 2 }}>
           {!isCompleted && (
             <Button
@@ -321,3 +325,4 @@ export default function ConceptPage() {
     </Container>
   );
 }
+

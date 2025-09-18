@@ -35,7 +35,7 @@ export function DataTable({
 }: DataTableProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  
+
   if (!data || !data.columns || !data.values) {
     return (
       <Paper sx={{ p: 3, textAlign: 'center' }}>
@@ -43,28 +43,28 @@ export function DataTable({
       </Paper>
     );
   }
-  
+
   const { columns, values } = data;
-  
+
   // Limit rows if needed
   const displayValues = values.slice(0, maxRows);
-  
+
   // Pagination
   const paginatedValues = showPagination
     ? displayValues.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
     : displayValues;
-  
+
   const handleChangePage = (_event: unknown, newPage: number) => {
     // reference param to satisfy noUnusedParameters
     void _event;
     setPage(newPage);
   };
-  
+
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
-  
+
   // Format cell value
   const formatCellValue = (value: any) => {
     if (value === null || value === undefined) {
@@ -109,7 +109,7 @@ export function DataTable({
     }
     return String(value);
   };
-  
+
   return (
     <Box>
       <TableContainer
@@ -176,7 +176,7 @@ export function DataTable({
           </TableBody>
         </Table>
       </TableContainer>
-      
+
       {showPagination && values.length > rowsPerPage && (
         <TablePagination
           component="div"
@@ -188,7 +188,7 @@ export function DataTable({
           rowsPerPageOptions={[5, 10, 25, 50]}
         />
       )}
-      
+
       {values.length > maxRows && (
         <Box sx={{ p: 1, bgcolor: 'warning.main', color: 'warning.contrastText' }}>
           <Typography variant="caption">

@@ -42,7 +42,7 @@ export function SQLEditor({
     }),
     EditorView.lineWrapping,
   ];
-  
+
   // Add keyboard shortcut for execution
   if (onExecute) {
     extensions.push(
@@ -58,7 +58,7 @@ export function SQLEditor({
       ])
     );
   }
-  
+
   return (
     <Paper
       elevation={2}
@@ -121,7 +121,7 @@ export function SQLDisplay({ children, inline = false }: SQLDisplayProps) {
       </Box>
     );
   }
-  
+
   return (
     <Box sx={{ mb: 2 }}>
       <SQLEditor

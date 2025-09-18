@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import type { LazyExoticComponent, ComponentType } from 'react';
 
-import { contentComponents } from '../content';
+import { contentComponents } from '@/features/content';
 
 export type ContentComponent = LazyExoticComponent<ComponentType<any>>;
 
@@ -11,3 +11,4 @@ export function useContent(contentId: string | null | undefined, tab: string): C
     return contentComponents[contentId]?.[tab];
   }, [contentId, tab]);
 }
+

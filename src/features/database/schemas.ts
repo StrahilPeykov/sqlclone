@@ -160,7 +160,7 @@ export const schemas = {
 export function getTableNames(schema: string): string[] {
   const matches = schema.match(/CREATE TABLE (\w+)/gi);
   if (!matches) return [];
-  
+
   return matches.map(match => match.replace(/CREATE TABLE /i, '').trim());
 }
 
@@ -172,7 +172,7 @@ export function getSchemaDescription(schemaKey: keyof typeof schemas): string {
     companiesAndPositions: 'Companies and their available positions',
     employees: 'Employee management with projects and hierarchies',
   };
-  
+
   return descriptions[schemaKey] || 'Database schema';
 }
 

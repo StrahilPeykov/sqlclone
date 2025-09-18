@@ -18,31 +18,31 @@ export class ErrorBoundary extends Component<Props, State> {
     super(props);
     this.state = { hasError: false };
   }
-  
+
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
-  
+
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('Error caught by boundary:', error, errorInfo);
-    
+
     // Send to error tracking service in production
     if (import.meta.env.PROD) {
       // trackError(error, errorInfo);
     }
   }
-  
+
   handleReset = () => {
     this.setState({ hasError: false, error: undefined });
     window.location.reload();
   };
-  
+
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      
+
       return (
         <Box
           sx={{
@@ -77,7 +77,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </Box>
             )}
           </Alert>
-          
+
           <Button
             variant="contained"
             startIcon={<RefreshIcon />}
@@ -88,7 +88,7 @@ export class ErrorBoundary extends Component<Props, State> {
         </Box>
       );
     }
-    
+
     return this.props.children;
   }
 }

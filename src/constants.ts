@@ -14,7 +14,7 @@ export const THEME_COLORS = {
 export const SKILL_SCHEMAS = {
   default: 'companies',
   'filter-rows': 'companies',
-  'choose-columns': 'companies', 
+  'choose-columns': 'companies',
   'sort-rows': 'companies',
   'process-columns': 'positions',
   'filter-rows-multiple': 'companiesAndPositions',

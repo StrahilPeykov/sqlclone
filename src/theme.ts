@@ -84,4 +84,4 @@ export const theme = getTheme('dark');
 export const ColorModeContext = createContext<{
   mode: PaletteMode;
   toggleColorMode: () => void;
-}>({ mode: 'dark', toggleColorMode: () => {} });
+}>({ mode: 'dark', toggleColorMode: () => { } });

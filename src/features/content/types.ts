@@ -23,18 +23,18 @@ export const ConceptContentSchema = z.object({
 export const ExerciseSchema = z.object({
   id: z.string(),
   version: z.number(),
-  
+
   // Exercise configuration
   config: z.object({
     database: z.string().optional(),
   }),
-  
+
   // Generation function (stored as string, evaluated at runtime)
   generator: z.string(),
-  
+
   // Validation function (stored as string, evaluated at runtime)
   validator: z.string(),
-  
+
   // Solution template
   solutionTemplate: z.string().optional(),
 });

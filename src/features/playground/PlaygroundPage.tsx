@@ -40,7 +40,7 @@ export default function PlaygroundPage() {
   const [query, setQuery] = useState('SELECT * FROM companies LIMIT 10;');
   const [currentTab, setCurrentTab] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
-  
+
   // Use the new playground database hook
   const {
     executeQuery,
@@ -51,20 +51,20 @@ export default function PlaygroundPage() {
     resetDatabase,
     isReady
   } = usePlaygroundDatabase(selectedSchema);
-  
+
   // Get saved queries from store
   const savedQueries = useAppStore(state => state.components.playground?.savedQueries || []);
   const updatePlayground = useAppStore(state => state.updateComponent);
-  
+
   // Get history from store
-  const history: QueryHistory[] = useAppStore(state => 
+  const history: QueryHistory[] = useAppStore(state =>
     state.components.playground?.history || []
   );
-  
+
   const handleExecute = async () => {
     try {
       const result = await executeQuery(query);
-      
+
       // Add to history
       const newHistoryEntry: QueryHistory = {
         query,
@@ -72,11 +72,11 @@ export default function PlaygroundPage() {
         success: true,
         rowCount: result?.[0]?.values?.length || 0,
       };
-      
+
       updatePlayground('playground', {
         history: [newHistoryEntry, ...history.slice(0, 49)]
       });
-      
+
       setMessage(`Query executed successfully (${result?.[0]?.values?.length || 0} rows)`);
     } catch (error) {
       const newHistoryEntry: QueryHistory = {
@@ -84,15 +84,15 @@ export default function PlaygroundPage() {
         timestamp: new Date(),
         success: false,
       };
-      
+
       updatePlayground('playground', {
         history: [newHistoryEntry, ...history.slice(0, 49)]
       });
-      
+
       setMessage(`Query failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
-  
+
   const handleSaveQuery = () => {
     const name = prompt('Enter a name for this query:');
     if (name) {
@@ -101,12 +101,12 @@ export default function PlaygroundPage() {
       setMessage('Query saved successfully');
     }
   };
-  
+
   const handleLoadQuery = (savedQuery: { name: string; query: string }) => {
     setQuery(savedQuery.query);
     setMessage(`Loaded: ${savedQuery.name}`);
   };
-  
+
   const handleCopyQuery = async () => {
     try {
       await navigator.clipboard.writeText(query);
@@ -115,20 +115,20 @@ export default function PlaygroundPage() {
       setMessage('Failed to copy query');
     }
   };
-  
+
   const handleClearQuery = () => {
     setQuery('');
   };
-  
+
   const handleExportResults = () => {
     if (!queryResult || queryResult.length === 0) return;
-    
+
     const data = queryResult[0];
     const csv = [
       data.columns.join(','),
       ...data.values.map((row: any[]) => row.map((cell: any) => JSON.stringify(cell)).join(',')),
     ].join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -136,24 +136,24 @@ export default function PlaygroundPage() {
     a.download = 'query_results.csv';
     a.click();
     URL.revokeObjectURL(url);
-    
+
     setMessage('Results exported as CSV');
   };
-  
+
   const handleResetDatabase = () => {
     if (confirm('Are you sure you want to reset the database to its initial state? This will lose all your changes.')) {
       resetDatabase();
       setMessage('Database reset successfully');
     }
   };
-  
+
   const handleSchemaChange = (newSchema: SchemaKey) => {
     setSelectedSchema(newSchema);
     // Update the default query based on the new schema
     const firstTable = getFirstTableFromSchema(newSchema);
     setQuery(`SELECT * FROM ${firstTable} LIMIT 10;`);
   };
-  
+
   const handleDeleteSavedQuery = (index: number) => {
     const newSavedQueries = savedQueries.filter((_: any, i: number) => i !== index);
     updatePlayground('playground', { savedQueries: newSavedQueries });
@@ -166,7 +166,7 @@ export default function PlaygroundPage() {
     const match = schema.match(/CREATE TABLE (\w+)/);
     return match ? match[1] : 'companies';
   };
-  
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
@@ -178,7 +178,7 @@ export default function PlaygroundPage() {
           Experiment with SQL queries on sample databases. Your changes persist until you reset.
         </Typography>
       </Box>
-      
+
       {/* Database Selector */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 2 }}>
         <FormControl sx={{ minWidth: 250 }}>
@@ -202,9 +202,9 @@ export default function PlaygroundPage() {
             ))}
           </Select>
         </FormControl>
-        
-        <Button 
-          variant="outlined" 
+
+        <Button
+          variant="outlined"
           startIcon={<Refresh />}
           onClick={handleResetDatabase}
           disabled={!isReady}
@@ -212,7 +212,7 @@ export default function PlaygroundPage() {
           Reset Database
         </Button>
       </Box>
-      
+
       {/* Available Tables */}
       {tableNames.length > 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
@@ -221,18 +221,18 @@ export default function PlaygroundPage() {
           </Typography>
         </Alert>
       )}
-      
+
       {/* Messages */}
       {message && (
-        <Alert 
-          severity="info" 
+        <Alert
+          severity="info"
           sx={{ mb: 2 }}
           onClose={() => setMessage(null)}
         >
           {message}
         </Alert>
       )}
-      
+
       {/* SQL Editor */}
       <Paper sx={{ mb: 2 }}>
         <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
@@ -261,7 +261,7 @@ export default function PlaygroundPage() {
             )}
           </ButtonGroup>
         </Box>
-        
+
         <SQLEditor
           value={query}
           onChange={setQuery}
@@ -270,7 +270,7 @@ export default function PlaygroundPage() {
           showResults={false}
         />
       </Paper>
-      
+
       {/* Results/History Tabs */}
       <Paper>
         <Tabs value={currentTab} onChange={(_, v) => setCurrentTab(v)}>
@@ -278,7 +278,7 @@ export default function PlaygroundPage() {
           <Tab label="History" />
           <Tab label="Saved Queries" />
         </Tabs>
-        
+
         <Box sx={{ p: 2 }}>
           {/* Results Tab */}
           {currentTab === 0 && (
@@ -288,7 +288,7 @@ export default function PlaygroundPage() {
                   {queryError instanceof Error ? queryError.message : 'Query execution failed'}
                 </Alert>
               )}
-              
+
               {queryResult && queryResult.length > 0 ? (
                 <DataTable data={queryResult[0]} />
               ) : (
@@ -298,7 +298,7 @@ export default function PlaygroundPage() {
               )}
             </>
           )}
-          
+
           {/* History Tab */}
           {currentTab === 1 && (
             <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
@@ -316,9 +316,9 @@ export default function PlaygroundPage() {
                     onClick={() => setQuery(item.query)}
                   >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
+                      <Typography
+                        variant="body2"
+                        sx={{
                           fontFamily: 'monospace',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -346,7 +346,7 @@ export default function PlaygroundPage() {
               )}
             </Box>
           )}
-          
+
           {/* Saved Queries Tab */}
           {currentTab === 2 && (
             <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
@@ -367,8 +367,8 @@ export default function PlaygroundPage() {
                         </Typography>
                         <Typography
                           variant="body2"
-                          sx={{ 
-                            fontFamily: 'monospace', 
+                          sx={{
+                            fontFamily: 'monospace',
                             color: 'text.secondary',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',

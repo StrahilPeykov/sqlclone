@@ -8,7 +8,7 @@ if (import.meta.env.PROD) {
     console.error('Global error:', event.error);
     // TODO: Send to error tracking service
   });
-  
+
   window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
     // TODO: Send to error tracking service

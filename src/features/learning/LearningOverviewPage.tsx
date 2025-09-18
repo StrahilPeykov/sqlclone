@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useLayoutEffect } from 'react';
+﻿import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import {
   Container,
   Typography,
@@ -10,13 +10,12 @@ import {
   FormControlLabel,
 } from '@mui/material';
 import { CheckCircle, PlayArrow, MenuBook, Build } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAppStore } from '@/store';
-import { contentIndex as learningContentIndex, type ContentMeta } from './content';
+import { contentIndex as learningContentIndex, type ContentMeta } from '@/features/content';
 type ComponentMeta = ContentMeta;
 
 export default function LearningOverviewPage() {
-  const navigate = useNavigate();
   const components = useAppStore(state => state.components);
 
   const contentItems = useMemo(() => learningContentIndex, []);
@@ -26,12 +25,12 @@ export default function LearningOverviewPage() {
   const isCompleted = (id: string) => {
     const component = components[id];
     if (!component) return false;
-    
+
     // For concepts, check if understood
     if (concepts.find(c => c.id === id)) {
       return component.understood === true;
     }
-    
+
     // For skills, check if completed (3+ exercises)
     return (component.numSolved || 0) >= 3;
   };
@@ -39,12 +38,12 @@ export default function LearningOverviewPage() {
   const getProgress = (id: string) => {
     const component = components[id];
     if (!component) return null;
-    
+
     // For skills, return exercise progress
     if (skills.find(s => s.id === id) && component.numSolved) {
       return `${component.numSolved}/3`;
     }
-    
+
     return null;
   };
 
@@ -156,73 +155,75 @@ export default function LearningOverviewPage() {
           // Keep wrapper static so hover area doesn't change
         }}
       >
-        <Card
-          variant={completed ? 'outlined' : undefined}
-          sx={{
-            width: '100%',
-            height: 120,
-            display: 'flex',
-            flexDirection: 'column',
-            border: '1px solid',
-            borderColor: 'divider',
-            transition: 'box-shadow 90ms cubic-bezier(.2,.7,.2,1), border-color 90ms cubic-bezier(.2,.7,.2,1), background-color 90ms cubic-bezier(.2,.7,.2,1)',
-            backgroundColor: 'background.paper',
-            cursor: 'pointer',
-            '&:hover': {
-              boxShadow: 4,
-              borderColor: 'primary.light',
-              backgroundColor: 'action.hover',
-            },
-          }}
-          onClick={() => navigate(`/${type}/${item.id}`)}
-          onMouseEnter={() => {
-            if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current!);
-            setHoveredId(item.id);
-          }}
-          onMouseLeave={() => {
-            if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current!);
-            hoverTimerRef.current = window.setTimeout(() => setHoveredId(null), 60);
-          }}
-          role="button"
-          tabIndex={0}
+        <Link
+          to={`/${type}/${item.id}`}
+          style={{ textDecoration: 'none', color: 'inherit' }}
         >
-        <CardContent sx={{ pb: 1, flexGrow: 1, minHeight: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-            <Icon fontSize="small" color={type === 'concept' ? 'action' : 'primary'} />
-            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography
-                  variant="subtitle1"
-                  component="h3"
-                  sx={{ fontWeight: 600, color: completed ? 'text.secondary' : 'text.primary' }}
-                  noWrap
-                >
-                  {item.name}
-                </Typography>
-                {completed ? (
-                  <Tooltip disableInteractive title={type === 'concept' ? 'Understood' : 'Mastered'}>
-                    <CheckCircle color="success" fontSize="small" />
-                  </Tooltip>
-                ) : (
-                  <Tooltip disableInteractive title="Not completed">
-                    <PlayArrow color="action" fontSize="small" />
-                  </Tooltip>
+          <Card
+            variant={completed ? 'outlined' : undefined}
+            sx={{
+              width: '100%',
+              height: 120,
+              display: 'flex',
+              flexDirection: 'column',
+              border: '1px solid',
+              borderColor: 'divider',
+              transition: 'box-shadow 90ms cubic-bezier(.2,.7,.2,1), border-color 90ms cubic-bezier(.2,.7,.2,1), background-color 90ms cubic-bezier(.2,.7,.2,1)',
+              backgroundColor: 'background.paper',
+              cursor: 'pointer',
+              '&:hover': {
+                boxShadow: 4,
+                borderColor: 'primary.light',
+                backgroundColor: 'action.hover',
+              },
+            }}
+            onMouseEnter={() => {
+              if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current!);
+              setHoveredId(item.id);
+            }}
+            onMouseLeave={() => {
+              if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current!);
+              hoverTimerRef.current = window.setTimeout(() => setHoveredId(null), 60);
+            }}
+          >
+          <CardContent sx={{ pb: 1, flexGrow: 1, minHeight: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+              <Icon fontSize="small" color={type === 'concept' ? 'action' : 'primary'} />
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography
+                    variant="subtitle1"
+                    component="h3"
+                    sx={{ fontWeight: 600, color: completed ? 'text.secondary' : 'text.primary' }}
+                    noWrap
+                  >
+                    {item.name}
+                  </Typography>
+                  {completed ? (
+                    <Tooltip disableInteractive title={type === 'concept' ? 'Understood' : 'Mastered'}>
+                      <CheckCircle color="success" fontSize="small" />
+                    </Tooltip>
+                  ) : (
+                    <Tooltip disableInteractive title="Not completed">
+                      <PlayArrow color="action" fontSize="small" />
+                    </Tooltip>
+                  )}
+                </Box>
+                {item.description && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {item.description}
+                  </Typography>
+                )}
+                {progress && (
+                  <Typography variant="caption" color="primary" sx={{ display: 'block', fontWeight: 600, mt: 0.5 }}>
+                    Progress: {progress}
+                  </Typography>
                 )}
               </Box>
-              {item.description && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {item.description}
-                </Typography>
-              )}
-              {progress && (
-                <Typography variant="caption" color="primary" sx={{ display: 'block', fontWeight: 600, mt: 0.5 }}>
-                  Progress: {progress}
-                </Typography>
-              )}
             </Box>
-          </Box>
-        </CardContent>
-        </Card>
+          </CardContent>
+          </Card>
+        </Link>
       </Box>
     );
   };
@@ -374,3 +375,4 @@ export default function LearningOverviewPage() {
     </Container>
   );
 }
+

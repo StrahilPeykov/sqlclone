@@ -18,30 +18,30 @@
   --color-primary: #c8102e;
   --color-primary-light: #ff4444;
   --color-primary-dark: #960000;
-  
+
   --color-secondary: #262626;
   --color-secondary-light: #3e3e3e;
   --color-secondary-dark: #0f0f0f;
-  
+
   --color-background: #181818;
   --color-surface: #21252b;
   --color-surface-light: #282c34;
-  
+
   --color-text-primary: #eaecf1;
   --color-text-secondary: #abb2bf;
   --color-text-disabled: #5c6370;
-  
+
   --color-success: #98bc37;
   --color-warning: #e5c07b;
   --color-error: #e73636;
   --color-info: #61afef;
-  
+
   --color-divider: #3e4451;
-  
+
   /* Typography */
   --font-family-base: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-family-code: 'Fira Code', 'Courier New', monospace;
-  
+
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -49,12 +49,12 @@
   --spacing-lg: 24px;
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
-  
+
   /* Transitions */
   --transition-fast: 150ms ease-in-out;
   --transition-normal: 250ms ease-in-out;
   --transition-slow: 350ms ease-in-out;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
@@ -108,18 +108,40 @@ body {
 }
 
 /* Typography defaults */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin: 0;
   font-weight: 500;
   line-height: 1.2;
 }
 
-h1 { font-size: 2.5rem; }
-h2 { font-size: 2rem; }
-h3 { font-size: 1.75rem; }
-h4 { font-size: 1.5rem; }
-h5 { font-size: 1.25rem; }
-h6 { font-size: 1rem; }
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+}
+
+h3 {
+  font-size: 1.75rem;
+}
+
+h4 {
+  font-size: 1.5rem;
+}
+
+h5 {
+  font-size: 1.25rem;
+}
+
+h6 {
+  font-size: 1rem;
+}
 
 p {
   margin: 0 0 1rem;
@@ -199,8 +221,15 @@ pre code {
 
 /* Loading animation */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .animate-pulse {
@@ -209,8 +238,15 @@ pre code {
 
 /* Fade animation */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -219,8 +255,15 @@ pre code {
 
 /* Slide animation */
 @keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .animate-slide-up {
@@ -342,8 +385,13 @@ pre code {
 }
 
 @keyframes loading {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* Error states */
@@ -382,16 +430,27 @@ pre code {
   :root {
     font-size: 14px;
   }
-  
-  h1 { font-size: 2rem; }
-  h2 { font-size: 1.75rem; }
-  h3 { font-size: 1.5rem; }
-  h4 { font-size: 1.25rem; }
-  
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.75rem;
+  }
+
+  h3 {
+    font-size: 1.5rem;
+  }
+
+  h4 {
+    font-size: 1.25rem;
+  }
+
   .sql-editor .cm-content {
     padding: var(--spacing-sm);
   }
-  
+
   pre {
     padding: var(--spacing-sm);
   }
@@ -401,7 +460,7 @@ pre code {
   :root {
     font-size: 12px;
   }
-  
+
   .sql-editor .cm-content {
     padding: var(--spacing-xs);
   }
@@ -413,16 +472,16 @@ pre code {
     background: white;
     color: black;
   }
-  
+
   .no-print {
     display: none !important;
   }
-  
+
   .sql-editor,
   .data-table {
     border: 1px solid #ccc;
   }
-  
+
   a {
     color: black;
     text-decoration: underline;
@@ -442,6 +501,7 @@ pre code {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -449,7 +509,7 @@ pre code {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  
+
   .animate-pulse,
   .animate-fade-in,
   .animate-slide-up {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import {
   Drawer,
   List,
@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store';
-import { contentIndex as learningContentIndex, type ContentMeta } from '@/features/learning/content';
+import { contentIndex as learningContentIndex, type ContentMeta } from '@/features/content';
 
 interface SidebarProps {
   open: boolean;
@@ -34,12 +34,12 @@ export function Sidebar({ open }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const components = useAppStore(state => state.components);
-  
+
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     concepts: true,
     skills: true,
   });
-  
+
   const contentItems = useMemo(() => learningContentIndex, []);
 
   // Group components by type
@@ -48,51 +48,51 @@ export function Sidebar({ open }: SidebarProps) {
     const skills = contentItems.filter((c) => c.type === 'skill');
     return { concepts, skills };
   }, [contentItems]);
-  
+
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section],
     }));
   };
-  
+
   const handleNavigate = (type: 'concept' | 'skill', componentId: string) => {
     navigate(`/${type}/${componentId}`);
   };
-  
+
   const isCompleted = (component: ComponentMeta) => {
     const state = components[component.id];
     if (!state) return false;
-    
+
     // For concepts, check if understood
     if (component.type === 'concept') {
       return state.understood === true;
     }
-    
+
     // For skills, check if completed (3+ exercises)
     return (state.numSolved || 0) >= 3;
   };
-  
+
   const getProgress = (component: ComponentMeta) => {
     const state = components[component.id];
     if (!state) return null;
-    
+
     // For skills, show exercise progress
     if (component.type === 'skill' && state.numSolved) {
       return `${state.numSolved}/3`;
     }
-    
+
     return null;
   };
-  
+
   const isActive = (component: ComponentMeta) => {
     const path = location.pathname;
     return path.includes(`/${component.type}/${component.id}`);
   };
-  
+
   const completedConcepts = groupedComponents.concepts.filter(c => isCompleted(c)).length;
   const completedSkills = groupedComponents.skills.filter(s => isCompleted(s)).length;
-  
+
   return (
     <Drawer
       variant="permanent"
@@ -127,13 +127,13 @@ export function Sidebar({ open }: SidebarProps) {
                 {expandedSections.concepts ? <ExpandLess /> : <ExpandMore />}
               </ListItemButton>
             </ListItem>
-            
+
             <Collapse in={expandedSections.concepts} timeout="auto" unmountOnExit>
               <List component="div" disablePadding>
                 {groupedComponents.concepts.map((concept) => {
                   const completed = isCompleted(concept);
                   const active = isActive(concept);
-                  
+
                   return (
                     <ListItem
                       key={concept.id}
@@ -178,9 +178,9 @@ export function Sidebar({ open }: SidebarProps) {
               </List>
             </Collapse>
           </List>
-          
+
           <Divider />
-          
+
           {/* Skills Section */}
           <List>
             <ListItem disablePadding>
@@ -195,14 +195,14 @@ export function Sidebar({ open }: SidebarProps) {
                 {expandedSections.skills ? <ExpandLess /> : <ExpandMore />}
               </ListItemButton>
             </ListItem>
-            
+
             <Collapse in={expandedSections.skills} timeout="auto" unmountOnExit>
               <List component="div" disablePadding>
                 {groupedComponents.skills.map((skill) => {
                   const progress = getProgress(skill);
                   const completed = isCompleted(skill);
                   const active = isActive(skill);
-                  
+
                   return (
                     <ListItem
                       key={skill.id}
@@ -255,7 +255,7 @@ export function Sidebar({ open }: SidebarProps) {
               </List>
             </Collapse>
           </List>
-          
+
           {/* Stats Summary */}
           <Box sx={{ p: 2, mt: 'auto', borderTop: 1, borderColor: 'divider' }}>
             <Typography variant="caption" color="text.secondary">
@@ -299,3 +299,4 @@ export function Sidebar({ open }: SidebarProps) {
     </Drawer>
   );
 }
+

@@ -5,9 +5,9 @@ interface LoadingScreenProps {
   fullScreen?: boolean;
 }
 
-export function LoadingScreen({ 
-  message = 'Loading...', 
-  fullScreen = false 
+export function LoadingScreen({
+  message = 'Loading...',
+  fullScreen = false
 }: LoadingScreenProps) {
   return (
     <Box

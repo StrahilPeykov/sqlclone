@@ -27,15 +27,15 @@ interface UseDatabaseReturn {
 }
 
 export function useDatabase(options: DatabaseOptions): UseDatabaseReturn {
-  const { 
-    context, 
-    schema, 
+  const {
+    context,
+    schema,
     resetOnSchemaChange = true,
-    persistent = false 
+    persistent = false
   } = options;
 
   const { databases: contextDatabases, getDatabase, resetDatabase: resetContextDatabase, isReady: contextReady } = useDatabaseContext();
-  
+
   const [currentSchema, setCurrentSchema] = useState<string>('');
   const [database, setDatabase] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);

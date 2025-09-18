@@ -17,23 +17,23 @@ interface SavedQuery {
 interface ComponentState {
   // Component ID
   id?: string;
-  
+
   // For concepts
   understood?: boolean;
   tab?: string;
-  
+
   // For skills
   numSolved?: number;
   exerciseHistory?: any[];
-  
+
   // For playground
   savedQueries?: SavedQuery[];
   history?: QueryHistory[];
-  
+
   // Common
   lastAccessed?: Date;
   type?: 'concept' | 'skill' | 'playground';
-  
+
   // Allow any additional properties for extensibility
   [key: string]: any;
 }
@@ -41,14 +41,14 @@ interface ComponentState {
 interface AppState {
   // Component progress
   components: Record<string, ComponentState>;
-  
+
   // UI state
   sidebarOpen: boolean;
   currentTheme: 'light' | 'dark';
-  
+
   // Hydration state
   _hasHydrated: boolean;
-  
+
   // Actions
   updateComponent: (id: string, data: Partial<ComponentState>) => void;
   getComponent: (id: string) => ComponentState;
@@ -65,22 +65,22 @@ export const useAppStore = create<AppState>()(
       sidebarOpen: true,
       currentTheme: 'dark',
       _hasHydrated: false,
-      
-      updateComponent: (id, data) => 
+
+      updateComponent: (id, data) =>
         set(state => ({
           components: {
             ...state.components,
-            [id]: { 
-              ...state.components[id], 
+            [id]: {
+              ...state.components[id],
               ...data,
               id,
               lastAccessed: new Date()
             }
           }
         })),
-        
+
       getComponent: (id) => get().components[id] || { id },
-      
+
       resetComponent: (id) =>
         set(state => ({
           components: {
@@ -88,13 +88,13 @@ export const useAppStore = create<AppState>()(
             [id]: { id }
           }
         })),
-      
-      toggleSidebar: () => 
+
+      toggleSidebar: () =>
         set(state => ({ sidebarOpen: !state.sidebarOpen })),
-      
+
       setTheme: (theme) =>
         set({ currentTheme: theme }),
-      
+
       setHasHydrated: (hasHydrated) =>
         set({ _hasHydrated: hasHydrated }),
     }),
@@ -117,7 +117,7 @@ export const useAppStore = create<AppState>()(
 export function useComponentState(componentId: string) {
   const component = useAppStore(state => state.components[componentId] || { id: componentId });
   const updateComponent = useAppStore(state => state.updateComponent);
-  
+
   const setComponentState = useCallback((data: Partial<ComponentState> | ((prev: ComponentState) => Partial<ComponentState>)) => {
     if (typeof data === 'function') {
       const currentState = useAppStore.getState().components[componentId] || { id: componentId };
@@ -127,7 +127,7 @@ export function useComponentState(componentId: string) {
       updateComponent(componentId, data);
     }
   }, [componentId, updateComponent]);
-  
+
   return [component, setComponentState] as const;
 }
 
@@ -135,7 +135,7 @@ export function useComponentState(componentId: string) {
 export function useIsStoreReady() {
   const hasHydrated = useAppStore(state => state._hasHydrated);
   const [isReady, setIsReady] = useState(false);
-  
+
   useEffect(() => {
     if (hasHydrated) {
       // Give a tick for any remaining hydration to complete
@@ -143,7 +143,7 @@ export function useIsStoreReady() {
       return () => clearTimeout(timer);
     }
   }, [hasHydrated]);
-  
+
   return isReady;
 }
 

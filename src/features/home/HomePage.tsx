@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Hero Section */}
@@ -71,13 +71,13 @@ export default function HomePage() {
           </Button>
         </Box>
       </Paper>
-      
+
       {/* Features Grid */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
-            <CardContent sx={{ 
-              p: 4, 
+            <CardContent sx={{
+              p: 4,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -103,11 +103,11 @@ export default function HomePage() {
             </CardContent>
           </Card>
         </Grid>
-        
+
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%', textAlign: 'center' }}>
-            <CardContent sx={{ 
-              p: 4, 
+            <CardContent sx={{
+              p: 4,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',

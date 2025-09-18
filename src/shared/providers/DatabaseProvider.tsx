@@ -43,7 +43,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     exercise: null,
     concept: null,
   });
-  
+
   const [isReady, setIsReady] = useState(false);
 
   // Track creation timestamps for cleanup policies
@@ -120,7 +120,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
         console.warn(`Error closing ${context} database:`, error);
       }
     }
-    
+
     setDatabases(prev => ({ ...prev, [context]: null }));
     createdAtRef.current[context] = null;
   }, []);
@@ -136,7 +136,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
         }
       }
     });
-    
+
     setDatabases({
       playground: null,
       exercise: null,
@@ -223,8 +223,8 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
 function getTableNamesFromSchema(schema: string): string[] {
   const matches = schema.match(/CREATE TABLE (\w+)/gi);
   if (!matches) return [];
-  
-  return matches.map(match => 
+
+  return matches.map(match =>
     match.replace(/CREATE TABLE /i, '').trim()
   );
 }

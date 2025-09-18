@@ -31,11 +31,11 @@ export function SQLJSProvider({ children }: SQLJSProviderProps) {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         const SQLJSInstance = await initSqlJs({
           locateFile: (file: string) => `/sqljs/${file}`,
         });
-        
+
         setSQLJS(SQLJSInstance);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to initialize SQL.js');

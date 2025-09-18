@@ -15,9 +15,9 @@ export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const toggleSidebar = useAppStore((state) => state.toggleSidebar);
-  
+
   const isHome = location.pathname === '/';
-  
+
   const navItems = [
     { path: '/', label: 'Home', icon: HomeIcon },
     { path: '/learn', label: 'Learn', icon: LearnIcon },
@@ -25,7 +25,7 @@ export function Header() {
     { path: '/progress', label: 'Progress', icon: ProgressIcon },
     { path: '/playground', label: 'Playground', icon: PlaygroundIcon },
   ];
-  
+
   const handleBack = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -33,7 +33,7 @@ export function Header() {
       navigate('/');
     }
   };
-  
+
   return (
     <AppBar
       position="fixed"
@@ -55,7 +55,7 @@ export function Header() {
         >
           {isHome ? <MenuIcon /> : <BackIcon />}
         </IconButton>
-        
+
         {/* Title */}
         <Typography
           variant="h6"
@@ -69,13 +69,13 @@ export function Header() {
         >
           SQL Valley
         </Typography>
-        
+
         {/* Navigation */}
         <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, gap: 1 }}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path === '/' ? '/home' : item.path);
-            
+
             return (
               <Button
                 key={item.path}
