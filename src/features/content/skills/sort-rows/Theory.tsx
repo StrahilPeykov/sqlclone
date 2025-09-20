@@ -31,7 +31,7 @@ function SqlDrawing({ code, height = 240 }: SqlDrawingProps) {
   const normalizedCode = code.trim();
 
   return (
-    <Drawing width={960} height={height}>
+    <Drawing width={500} height={height}>
       <Rectangle dimensions={[[0, 0], [960, height]]} style={{ fill: 'blue', opacity: 0.1 }} />
       <Element position={[60, 48]} anchor={[0, 0]}>
         <SQL>{`\n${normalizedCode}\n`}</SQL>
@@ -47,7 +47,7 @@ function SingleColumnSortingDiagram() {
   const highlightBounds = bounds as any;
 
   return (
-    <Drawing width={960} height={240} ref={drawingRef}>
+    <Drawing width={500} height={240} ref={drawingRef}>
       <Element position={[0, 24]} anchor={[0, 0]}>
         <SQL setElement={setCodeElement}>{`
 SELECT *
