@@ -16,7 +16,7 @@ const scenarios: readonly ExerciseState[] = [
   },
   {
     id: 'sort-by-country-name',
-    description: 'List companies ordered by country (A–Z) and company name descending within each country.',
+    description: 'List companies ordered by country (A-Z) and company name descending within each country.',
     expectedQuery: 'SELECT * FROM companies ORDER BY country ASC, company_name DESC',
   },
   {
