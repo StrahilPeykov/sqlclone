@@ -138,8 +138,8 @@ export default function SkillPage() {
         if (cancelled) return;
         const extendedMod = mod as any;
         const moduleConfig: SkillExerciseModuleLike = {
-          generate: typeof mod.generate === 'function' ? mod.generate : undefined,
-          validate: typeof mod.validate === 'function' ? mod.validate : undefined,
+          generate: typeof extendedMod.generate === 'function' ? extendedMod.generate : undefined,
+          validate: typeof extendedMod.validate === 'function' ? extendedMod.validate : undefined,
           validateInput: typeof extendedMod.validateInput === 'function' ? extendedMod.validateInput : undefined,
           checkInput: typeof extendedMod.checkInput === 'function' ? extendedMod.checkInput : undefined,
           validateOutput: typeof extendedMod.validateOutput === 'function' ? extendedMod.validateOutput : undefined,

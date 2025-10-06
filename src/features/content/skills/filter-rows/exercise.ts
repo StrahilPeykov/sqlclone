@@ -8,9 +8,10 @@ import type {
   VerificationResult,
 } from '../../types';
 import { schemas } from '../../../database/schemas';
+import { parseSchemaRows } from '@/features/learning/exerciseEngine/schemaHelpers';
 
 // ============================================================================
-// DATA EXTRACTION
+// DATA SETUP
 // ============================================================================
 
 interface CompanyRow {
@@ -22,22 +23,42 @@ interface CompanyRow {
   industry: string | null;
 }
 
-const COMPANY_DATA: CompanyRow[] = parseCompaniesSchema(schemas.companies);
+const RAW_COMPANIES = parseSchemaRows(schemas.companies, 'companies');
 
-const COUNTRY_COUNTS = aggregateCounts(COMPANY_DATA.map((row) => row.country));
-const LETTER_COUNTS = aggregateCounts(
-  COMPANY_DATA
-    .map((row) => row.company_name?.[0]?.toUpperCase() || '')
-    .filter((letter) => letter.length === 1 && /[A-Z]/.test(letter)),
-);
+const COMPANIES: CompanyRow[] = RAW_COMPANIES.map((row) => ({
+  id: Number(row.id ?? 0),
+  company_name: String(row.company_name ?? ''),
+  country: String(row.country ?? ''),
+  founded_year: typeof row.founded_year === 'number' ? row.founded_year : null,
+  num_employees: typeof row.num_employees === 'number' ? row.num_employees : null,
+  industry: row.industry === null || row.industry === undefined ? null : String(row.industry),
+}));
 
-const COUNTRY_OPTIONS = Object.keys(COUNTRY_COUNTS).sort();
-const LETTER_OPTIONS = Object.keys(LETTER_COUNTS).sort();
+const COUNTRY_GROUPS = new Map<string, CompanyRow[]>();
+const LETTER_GROUPS = new Map<string, CompanyRow[]>();
 
-const REQUIRED_COLUMNS = ['id', 'company_name', 'country', 'founded_year', 'num_employees', 'industry'];
+COMPANIES.forEach((company) => {
+  if (company.country) {
+    const list = COUNTRY_GROUPS.get(company.country) ?? [];
+    list.push(company);
+    COUNTRY_GROUPS.set(company.country, list);
+  }
+
+  const letter = company.company_name.charAt(0).toUpperCase();
+  if (letter && /[A-Z]/.test(letter)) {
+    const list = LETTER_GROUPS.get(letter) ?? [];
+    list.push(company);
+    LETTER_GROUPS.set(letter, list);
+  }
+});
+
+const COUNTRY_OPTIONS = [...COUNTRY_GROUPS.keys()].sort();
+const LETTER_OPTIONS = [...LETTER_GROUPS.keys()].sort();
+
+const REQUIRED_COLUMNS = ['id', 'company_name', 'country'];
 
 // ============================================================================
-// MESSAGES - All user-facing text
+// MESSAGES
 // ============================================================================
 
 export const MESSAGES = {
@@ -47,77 +68,105 @@ export const MESSAGES = {
   },
   validation: {
     ...COMMON_MESSAGES.validation,
-    noResults: 'Query executed but returned no results.',
-    wrongStructure: 'Query result has invalid structure.',
-    missingColumns: 'Query should select all columns (use SELECT *).',
+    noResultSet: 'Query returned no data.',
+    missingColumns: 'Include the id, company_name, and country columns in your result.',
   },
   verification: {
     ...COMMON_MESSAGES.verification,
-    correct: 'Perfect! Your query correctly filters the data.',
+    correct: 'Perfect! Your query returned the correct rows.',
     wrongRowCount: 'Expected {expected} rows but got {actual}.',
-    wrongValues: "Returned rows don't match the expected set.",
+    wrongRows: 'Returned rows do not match the expected result.',
   },
 } as const;
 
 // ============================================================================
-// TYPES - Exercise-specific state
+// TYPES
 // ============================================================================
 
 export interface FilterRowsState {
-  id: 'filter-by-country' | 'filter-with-pattern';
-  type: 'country' | 'pattern';
-  value: string;
+  scenario: 'filter-by-country' | 'filter-with-pattern';
+  country?: string;
+  letter?: string;
+  expectedRows: CompanyRow[];
 }
 
 export interface ExerciseState {
-  id: FilterRowsState['id'];
+  id: FilterRowsState['scenario'];
   description: string;
   state: FilterRowsState;
 }
 
+interface ScenarioBuildResult {
+  description: string;
+  state: Omit<FilterRowsState, 'scenario'>;
+}
+
+interface ScenarioDefinition {
+  id: FilterRowsState['scenario'];
+  build(utils: Utils): ScenarioBuildResult;
+}
+
+const SCENARIOS: ScenarioDefinition[] = [
+  {
+    id: 'filter-by-country',
+    build(utils) {
+      const country = utils.selectRandomly(COUNTRY_OPTIONS as readonly string[]);
+      const expectedRows = [...(COUNTRY_GROUPS.get(country) ?? [])];
+
+      return {
+        description: template(MESSAGES.descriptions['filter-by-country'], { country }),
+        state: { country, expectedRows },
+      };
+    },
+  },
+  {
+    id: 'filter-with-pattern',
+    build(utils) {
+      const letter = utils.selectRandomly(LETTER_OPTIONS as readonly string[]);
+      const expectedRows = [...(LETTER_GROUPS.get(letter) ?? [])];
+
+      return {
+        description: template(MESSAGES.descriptions['filter-with-pattern'], { letter }),
+        state: { letter, expectedRows },
+      };
+    },
+  },
+];
+
 // ============================================================================
-// GENERATOR - Create new exercise instances
+// GENERATOR
 // ============================================================================
 
 export function generate(utils: Utils): ExerciseState {
-  const availableTypes: Array<FilterRowsState['type']> = [];
+  const availableScenarios = SCENARIOS.filter((scenario) => {
+    if (scenario.id === 'filter-by-country') {
+      return COUNTRY_OPTIONS.length > 0;
+    }
+    if (scenario.id === 'filter-with-pattern') {
+      return LETTER_OPTIONS.length > 0;
+    }
+    return true;
+  });
 
-  if (COUNTRY_OPTIONS.length > 0) availableTypes.push('country');
-  if (LETTER_OPTIONS.length > 0) availableTypes.push('pattern');
-
-  const type = availableTypes.length > 0 ? utils.selectRandomly(availableTypes as readonly FilterRowsState['type'][])
-    : 'country';
-
-  if (type === 'country' && COUNTRY_OPTIONS.length > 0) {
-    const country = utils.selectRandomly(COUNTRY_OPTIONS as readonly string[]);
-    return {
-      id: 'filter-by-country',
-      description: template(MESSAGES.descriptions['filter-by-country'], { country }),
-      state: {
-        id: 'filter-by-country',
-        type,
-        value: country,
-      },
-    };
+  if (availableScenarios.length === 0) {
+    throw new Error('No scenarios available for filter-rows exercise.');
   }
 
-  const letter = LETTER_OPTIONS.length > 0
-    ? utils.selectRandomly(LETTER_OPTIONS as readonly string[])
-    : 'A';
+  const scenario = utils.selectRandomly(availableScenarios as readonly ScenarioDefinition[]);
+  const result = scenario.build(utils);
 
   return {
-    id: 'filter-with-pattern',
-    description: template(MESSAGES.descriptions['filter-with-pattern'], { letter }),
+    id: scenario.id,
+    description: result.description,
     state: {
-      id: 'filter-with-pattern',
-      type: 'pattern',
-      value: letter,
+      scenario: scenario.id,
+      ...result.state,
     },
   };
 }
 
 // ============================================================================
-// VALIDATOR - Check execution result structure (NOT input)
+// VALIDATION
 // ============================================================================
 
 export function validateOutput(
@@ -133,27 +182,17 @@ export function validateOutput(
     };
   }
 
-  const output = result.output;
-
-  if (!output || output.length === 0) {
-    return {
-      ok: false,
-      message: MESSAGES.validation.noResults,
-    };
-  }
-
-  const firstResult = output[0];
+  const firstResult = result.output?.[0];
 
   if (!firstResult || !Array.isArray(firstResult.columns) || !Array.isArray(firstResult.values)) {
     return {
       ok: false,
-      message: MESSAGES.validation.wrongStructure,
+      message: MESSAGES.validation.noResultSet,
     };
   }
 
-  const hasRequiredColumns = REQUIRED_COLUMNS.every((column) => firstResult.columns.includes(column));
-
-  if (!hasRequiredColumns) {
+  const missing = REQUIRED_COLUMNS.filter((column) => !firstResult.columns.includes(column));
+  if (missing.length > 0) {
     return {
       ok: false,
       message: MESSAGES.validation.missingColumns,
@@ -164,208 +203,70 @@ export function validateOutput(
 }
 
 // ============================================================================
-// VERIFIER - Check if output is correct
+// VERIFICATION
 // ============================================================================
 
 export function verifyOutput(
   exercise: ExerciseState,
   output: QueryResult[] | undefined,
 ): VerificationResult {
-  const result = output?.[0];
+  const firstResult = output?.[0];
 
-  if (!result) {
+  if (!firstResult || !Array.isArray(firstResult.values)) {
     return {
       correct: false,
-      message: MESSAGES.validation.noResults,
+      message: MESSAGES.validation.noResultSet,
     };
   }
 
   const { state } = exercise;
-  const expectedRows = getExpectedRows(state);
-  const actualRows = Array.isArray(result.values) ? result.values : [];
+  const expectedIds = state.expectedRows.map((row) => row.id).sort((a, b) => a - b);
 
-  if (actualRows.length !== expectedRows.length) {
-    return {
-      correct: false,
-      message: template(MESSAGES.verification.wrongRowCount, {
-        expected: expectedRows.length,
-        actual: actualRows.length,
-      }),
-    };
-  }
-
-  const idIndex = result.columns.indexOf('id');
-  const countryIndex = result.columns.indexOf('country');
-  const nameIndex = result.columns.indexOf('company_name');
-
-  if (idIndex === -1 || countryIndex === -1 || nameIndex === -1) {
+  const idIndex = firstResult.columns.indexOf('id');
+  if (idIndex === -1) {
     return {
       correct: false,
       message: MESSAGES.validation.missingColumns,
     };
   }
 
-  const expectedIdSet = new Set(expectedRows.map((row) => row.id));
-  const actualIdSet = new Set<number>();
+  const actualIds = firstResult.values
+    .map((row) => Number(row?.[idIndex]))
+    .filter((id) => !Number.isNaN(id))
+    .sort((a, b) => a - b);
 
-  for (const row of actualRows) {
-    const rawId = row?.[idIndex];
-    const id = typeof rawId === 'number' ? rawId : Number(rawId);
-    if (!Number.isFinite(id)) {
-      return {
-        correct: false,
-        message: MESSAGES.verification.wrongValues,
-      };
-    }
-
-    actualIdSet.add(id);
-
-    if (state.type === 'country') {
-      if (row?.[countryIndex] !== state.value) {
-        return {
-          correct: false,
-          message: MESSAGES.verification.wrongValues,
-        };
-      }
-    } else if (state.type === 'pattern') {
-      const companyName = String(row?.[nameIndex] ?? '');
-      if (!companyName.startsWith(state.value)) {
-        return {
-          correct: false,
-          message: MESSAGES.verification.wrongValues,
-        };
-      }
-    }
-  }
-
-  const allExpectedSeen = expectedRows.every((row) => actualIdSet.has(row.id));
-  const noUnexpectedRows = [...actualIdSet].every((id) => expectedIdSet.has(id));
-
-  if (!allExpectedSeen || !noUnexpectedRows) {
+  if (actualIds.length !== expectedIds.length) {
     return {
       correct: false,
-      message: MESSAGES.verification.wrongValues,
+      message: template(MESSAGES.verification.wrongRowCount, {
+        expected: expectedIds.length,
+        actual: actualIds.length,
+      }),
     };
   }
 
+  const matches = expectedIds.every((expectedId, index) => expectedId === actualIds[index]);
+
   return {
-    correct: true,
-    message: MESSAGES.verification.correct,
+    correct: matches,
+    message: matches ? MESSAGES.verification.correct : MESSAGES.verification.wrongRows,
   };
 }
 
 // ============================================================================
-// SOLUTION PROVIDER
+// SOLUTION
 // ============================================================================
 
 export function getSolution(exercise: ExerciseState): string {
-  const { type, value } = exercise.state;
+  const { state } = exercise;
 
-  if (type === 'country') {
-    return `SELECT * FROM companies WHERE country = '${value}'`;
+  if (state.scenario === 'filter-by-country' && state.country) {
+    return `SELECT * FROM companies WHERE country = '${state.country}'`;
   }
 
-  return `SELECT * FROM companies WHERE company_name LIKE '${value}%'`;
-}
-
-// ============================================================================
-// HELPERS (private)
-// ============================================================================
-
-function parseCompaniesSchema(schemaSql: string): CompanyRow[] {
-  const insertMatch = schemaSql.match(/INSERT\s+INTO\s+companies\s+VALUES\s+([\s\S]*?);/i);
-  if (!insertMatch) return [];
-
-  const tuplesSegment = insertMatch[1];
-  const tupleRegex = /\(([^()]+)\)/g;
-  const rows: CompanyRow[] = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = tupleRegex.exec(tuplesSegment)) !== null) {
-    const tupleValues = parseTuple(match[1]);
-    if (tupleValues.length < 6) continue;
-
-    const [id, companyName, country, foundedYear, numEmployees, industry] = tupleValues;
-
-    rows.push({
-      id: toNumber(id),
-      company_name: companyName,
-      country,
-      founded_year: toNumberOrNull(foundedYear),
-      num_employees: toNumberOrNull(numEmployees),
-      industry: industry || null,
-    });
+  if (state.scenario === 'filter-with-pattern' && state.letter) {
+    return `SELECT * FROM companies WHERE company_name LIKE '${state.letter}%'`;
   }
 
-  return rows;
-}
-
-function parseTuple(tuple: string): string[] {
-  const values: string[] = [];
-  let current = '';
-  let inString = false;
-
-  for (let i = 0; i < tuple.length; i += 1) {
-    const char = tuple[i];
-
-    if (char === "'" && tuple[i - 1] !== '\\') {
-      inString = !inString;
-      continue;
-    }
-
-    if (char === ',' && !inString) {
-      values.push(normalizeLiteral(current));
-      current = '';
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current.trim().length > 0) {
-    values.push(normalizeLiteral(current));
-  }
-
-  return values;
-}
-
-function normalizeLiteral(raw: string): string {
-  const trimmed = raw.trim();
-  if (/^'.*'$/.test(trimmed)) {
-    return trimmed.slice(1, -1);
-  }
-  if (trimmed.toUpperCase() === 'NULL') {
-    return '';
-  }
-  return trimmed;
-}
-
-function toNumber(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function toNumberOrNull(value: string): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function aggregateCounts(values: string[]): Record<string, number> {
-  return values.reduce<Record<string, number>>((acc, value) => {
-    if (!value) return acc;
-    acc[value] = (acc[value] ?? 0) + 1;
-    return acc;
-  }, {});
-}
-
-function getExpectedRows(state: FilterRowsState): CompanyRow[] {
-  if (COMPANY_DATA.length === 0) return [];
-
-  if (state.type === 'country') {
-    return COMPANY_DATA.filter((row) => row.country === state.value);
-  }
-
-  const prefix = state.value;
-  return COMPANY_DATA.filter((row) => row.company_name.startsWith(prefix));
+  return 'SELECT * FROM companies WHERE country IS NOT NULL';
 }
