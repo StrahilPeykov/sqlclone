@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -16,7 +16,7 @@ import {
   DialogActions,
   Paper,
 } from '@mui/material';
-import { CheckCircle, ArrowBack, Refresh, ArrowForward, RestartAlt, MenuBook, Lightbulb, Edit, EmojiEvents, Storage } from '@mui/icons-material';
+import { CheckCircle, ArrowBack, ArrowForward, MenuBook, Lightbulb, Edit, EmojiEvents, Storage, Flag } from '@mui/icons-material';
 
 import { SQLEditor } from '@/shared/components/SQLEditor';
 import { DataTable } from '@/shared/components/DataTable';
@@ -36,7 +36,8 @@ type SkillExerciseModule = Awaited<ReturnType<SkillExerciseLoader>>;
 export default function SkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState(1); // Always start with practice tab
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [currentTab, setCurrentTab] = useState<string>('practice'); // Fallback to practice tab
 
   // State management
   const [componentState, setComponentState] = useComponentState<SkillComponentState>(skillId || '', 'skill');
@@ -49,14 +50,16 @@ export default function SkillPage() {
     { key: 'theory', label: 'Theory', icon: <Lightbulb /> },
     { key: 'data', label: 'Data Explorer', icon: <Storage /> },
   ];
-  
+
   const availableTabs = allTabs.filter(tab => !(hideStories && tab.key === 'story'));
 
   // Helper function to check current tab
   const isCurrentTab = (tabKey: string) => {
-    const tab = availableTabs[currentTab];
-    return tab ? tab.key === tabKey : false;
+    return currentTab === tabKey;
   };
+
+  const searchParamsString = searchParams.toString();
+  const normalizedTabParam = searchParams.get('tab')?.toLowerCase() ?? null;
 
   // Skill content + exercise state
   const [skillModule, setSkillModule] = useState<SkillExerciseModuleLike | null>(null);
@@ -73,6 +76,12 @@ export default function SkillPage() {
   );
   const [query, setQuery] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(window.localStorage.getItem('admin'));
+  });
+  const [showGiveUpDialog, setShowGiveUpDialog] = useState(false);
+  const [hasGivenUp, setHasGivenUp] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const exerciseCompleted = exerciseStatus === 'correct';
 
@@ -81,10 +90,10 @@ export default function SkillPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Database setup - use skill schema mapping or fallback to default
-  const skillSchema = (skillId && skillId in SKILL_SCHEMAS) 
+  const skillSchema = (skillId && skillId in SKILL_SCHEMAS)
     ? SKILL_SCHEMAS[skillId as keyof typeof SKILL_SCHEMAS] as SchemaKey
     : 'companies' as SchemaKey;
-  
+
   const {
     executeQuery,
     queryResult,
@@ -105,6 +114,24 @@ export default function SkillPage() {
   const isCompleted = (componentState.numSolved || 0) >= requiredCount;
 
   const normalizeForHistory = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim().replace(/;$/, '');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncAdminFlag = (_event?: Event) => {
+      setIsAdmin(Boolean(window.localStorage.getItem('admin')));
+    };
+    syncAdminFlag();
+    window.addEventListener('storage', syncAdminFlag);
+    window.addEventListener('admin-mode-change', syncAdminFlag);
+    return () => {
+      window.removeEventListener('storage', syncAdminFlag);
+      window.removeEventListener('admin-mode-change', syncAdminFlag);
+    };
+  }, []);
+
+  useEffect(() => {
+    setHasGivenUp(false);
+  }, [currentExercise]);
 
   useEffect(() => {
     if (!skillId) return;
@@ -167,21 +194,49 @@ export default function SkillPage() {
     };
   }, [resetExerciseDb]);
 
-  // Always default to practice tab
+  // Sync the active tab with URL params and persisted component state
   useEffect(() => {
-    const practiceIndex = availableTabs.findIndex(tab => tab.key === 'practice');
-    if (practiceIndex >= 0) {
-      setCurrentTab(practiceIndex);
-      setComponentState({ tab: 'practice' });
-    }
-  }, [availableTabs.length, hideStories]); // Only depend on tab count and hideStories changes
+    if (!availableTabs.length) return;
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setCurrentTab(newValue);
-    const selectedTab = availableTabs[newValue];
-    if (selectedTab) {
-      setComponentState({ tab: selectedTab.key });
+    const tabKeys = availableTabs.map((tab) => tab.key);
+    const defaultTab = tabKeys.includes('practice') ? 'practice' : tabKeys[0];
+
+    const preferredTab =
+      (normalizedTabParam && tabKeys.includes(normalizedTabParam) && normalizedTabParam) ||
+      (componentState.tab && tabKeys.includes(componentState.tab) && componentState.tab) ||
+      defaultTab;
+
+    if (!preferredTab) return;
+
+    if (preferredTab !== currentTab) {
+      setCurrentTab(preferredTab);
     }
+
+    if (componentState.tab !== preferredTab) {
+      setComponentState({ tab: preferredTab });
+    }
+
+    if (normalizedTabParam !== preferredTab) {
+      const params = new URLSearchParams(searchParamsString);
+      params.set('tab', preferredTab);
+      setSearchParams(params, { replace: true });
+    }
+  }, [
+    availableTabs,
+    componentState.tab,
+    currentTab,
+    normalizedTabParam,
+    searchParamsString,
+    setComponentState,
+    setSearchParams,
+  ]);
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: string) => {
+    setCurrentTab(newValue);
+    setComponentState({ tab: newValue });
+    const params = new URLSearchParams(searchParamsString);
+    params.set('tab', newValue);
+    setSearchParams(params, { replace: true });
   };
 
   const TheoryContent = useContent(skillMeta?.id, 'Theory');
@@ -212,13 +267,13 @@ export default function SkillPage() {
   // Handle live query execution (for preview results)
   const handleLiveExecute = useCallback(async (liveQuery: string) => {
     if (!dbReady || exerciseCompleted || !currentExercise) return;
-    
+
     // Clear feedback if query is empty
     if (!liveQuery.trim()) {
       setFeedback(null);
       return;
     }
-    
+
     try {
       // Just execute the query - don't do validation/verification for live updates
       // This keeps typing responsive
@@ -235,6 +290,14 @@ export default function SkillPage() {
     const rawQuery = override ?? query;
     const effectiveQuery = rawQuery.trim();
     if (!currentExercise || !effectiveQuery) return;
+
+    if (hasGivenUp) {
+      setFeedback({
+        message: 'You chose to view the solution. Review it, then move on to the next exercise.',
+        type: 'info',
+      });
+      return;
+    }
 
     if (exerciseCompleted) {
       setFeedback({ message: 'Already completed. Click Next Exercise to continue.', type: 'info' });
@@ -256,8 +319,10 @@ export default function SkillPage() {
           previousAttempt.status === 'correct'
             ? 'success'
             : previousAttempt.status === 'invalid'
-            ? 'warning'
-            : 'info',
+              ? 'warning'
+              : previousAttempt.status === 'incorrect'
+                ? 'error'
+                : 'info',
       });
       return;
     }
@@ -290,7 +355,7 @@ export default function SkillPage() {
         recordAttempt({ input: effectiveQuery, result: execution.output ?? null, validation });
         setFeedback({
           message: validation.message || 'Query result has invalid structure.',
-          type: execution.success ? 'warning' : 'error',
+          type: 'warning',
         });
         return;
       }
@@ -331,13 +396,13 @@ export default function SkillPage() {
       } else {
         setFeedback({
           message: verification.message || 'Not quite right. Check your query and try again!',
-          type: 'info',
+          type: 'error',
         });
       }
     } catch (error: any) {
       setFeedback({
         message: 'Query error: ' + (error?.message || 'Unknown error'),
-        type: 'error',
+        type: 'warning',
       });
     }
   }, [
@@ -355,15 +420,8 @@ export default function SkillPage() {
     setComponentState,
     exerciseDispatch,
     skillId,
+    hasGivenUp,
   ]);
-
-  // Reset database without changing the exercise instance
-  const handleResetDatabase = useCallback(() => {
-    resetExerciseDb();
-    exerciseDispatch({ type: 'reset', keepExercise: true });
-    setQuery('');
-    setFeedback({ message: 'Database reset - try again!', type: 'info' });
-  }, [resetExerciseDb, exerciseDispatch]);
 
   // Autocomplete solution for the current exercise
   const handleAutoComplete = useCallback(async () => {
@@ -397,14 +455,29 @@ export default function SkillPage() {
 
   // New exercise
   const handleNewExercise = useCallback(() => {
-    if (!exerciseCompleted) {
+    if (!exerciseCompleted && !hasGivenUp) {
       setFeedback({ message: 'Finish the current exercise before moving on.', type: 'info' });
       return;
     }
     exerciseDispatch({ type: 'generate' });
     setQuery('');
     setFeedback(null);
-  }, [exerciseCompleted, exerciseDispatch]);
+    setHasGivenUp(false);
+  }, [exerciseCompleted, exerciseDispatch, hasGivenUp]);
+
+  const handleGiveUpConfirm = useCallback(() => {
+    setShowGiveUpDialog(false);
+    setFeedback({
+      message: 'Solution loaded. Take a moment to review it and explore the Theory page for more guidance.',
+      type: 'info',
+    });
+    setHasGivenUp(true);
+    void handleAutoComplete();
+  }, [handleAutoComplete, setFeedback, setShowGiveUpDialog, setHasGivenUp]);
+
+  const handleGiveUpCancel = useCallback(() => {
+    setShowGiveUpDialog(false);
+  }, [setShowGiveUpDialog]);
 
   if (isLoading) {
     return (
@@ -441,7 +514,7 @@ export default function SkillPage() {
             <Typography variant="body2" color="text.secondary">
               Progress:
             </Typography>
-            <Box sx={{ 
+            <Box sx={{
               bgcolor: isCompleted ? 'success.main' : 'primary.main',
               color: 'white',
               px: 1.5,
@@ -462,8 +535,8 @@ export default function SkillPage() {
       </Box>
 
       {/* Description */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body1" color="text.secondary">
+      <Box sx={{ mb: 2, pl: 2 }}>
+        <Typography variant="body1" color="text.secondary" sx={{ fontSize: '0.95rem' }}>
           {skillMeta.description}
         </Typography>
       </Box>
@@ -473,16 +546,17 @@ export default function SkillPage() {
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={currentTab} onChange={handleTabChange}>
             {availableTabs.map((tab) => (
-              <Tab 
-                key={tab.key} 
-                label={tab.label} 
-                icon={tab.icon} 
-                iconPosition="start" 
+              <Tab
+                key={tab.key}
+                value={tab.key}
+                label={tab.label}
+                icon={tab.icon}
+                iconPosition="start"
               />
             ))}
           </Tabs>
         </Box>
-        
+
         {/* Tab Content */}
         {isCurrentTab('practice') && (
           <Box sx={{ p: 3 }}>
@@ -506,67 +580,23 @@ export default function SkillPage() {
               </Paper>
             )}
 
-            {/* Action Buttons */}
-            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* Admin Tools */}
+            {isAdmin && (
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
                 <Button
                   size="small"
-                  onClick={handleAutoComplete}
+                  onClick={() => { void handleAutoComplete(); }}
                   startIcon={<Lightbulb />}
                   disabled={!currentExercise || isExecuting}
                   variant="outlined"
                 >
                   Show Solution
                 </Button>
-                <Button
-                  size="small"
-                  startIcon={<RestartAlt />}
-                  onClick={handleResetDatabase}
-                  disabled={!dbReady || isExecuting}
-                  title="Reset the current exercise database"
-                  variant="outlined"
-                >
-                  Reset Database
-                </Button>
               </Box>
-              
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {!exerciseCompleted ? (
-                  <Button
-                    size="small"
-                    startIcon={<Refresh />}
-                    onClick={handleNewExercise}
-                    disabled={isExecuting}
-                    title="Finish the current exercise to unlock a new one"
-                    variant="outlined"
-                  >
-                    Try Another
-                  </Button>
-                ) : (
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<ArrowForward />}
-                    onClick={handleNewExercise}
-                    title="Proceed to the next exercise"
-                  >
-                    Next Exercise
-                  </Button>
-                )}
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={<CheckCircle />}
-                  onClick={() => { void handleExecute(); }}
-                  disabled={!currentExercise || !query.trim() || isExecuting || exerciseCompleted || !dbReady}
-                >
-                  Submit Answer
-                </Button>
-              </Box>
-            </Box>
+            )}
 
             {/* SQL Editor - No extra wrapper */}
-            <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 2 }}>
               <SQLEditor
                 value={query}
                 onChange={setQuery}
@@ -577,6 +607,55 @@ export default function SkillPage() {
                 liveExecutionDelay={150}
                 showResults={false}
               />
+            </Box>
+
+            {/* Submission Controls */}
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap', mb: 3 }}>
+              {!exerciseCompleted ? (
+                hasGivenUp ? (
+                  <Button
+                    variant="contained"
+                    size="medium"
+                    startIcon={<ArrowForward />}
+                    onClick={handleNewExercise}
+                    title="Move to the next exercise"
+                  >
+                    Next Exercise
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="outlined"
+                      size="medium"
+                      startIcon={<Flag />}
+                      color="warning"
+                      onClick={() => setShowGiveUpDialog(true)}
+                      disabled={!currentExercise || isExecuting}
+                    >
+                      Give Up
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="medium"
+                      startIcon={<CheckCircle />}
+                      onClick={() => { void handleExecute(); }}
+                      disabled={!currentExercise || !query.trim() || isExecuting || !dbReady || !!queryError}
+                    >
+                      Submit Answer
+                    </Button>
+                  </>
+                )
+              ) : (
+                <Button
+                  variant="contained"
+                  size="medium"
+                  startIcon={<ArrowForward />}
+                  onClick={handleNewExercise}
+                  title="Proceed to the next exercise"
+                >
+                  Next Exercise
+                </Button>
+              )}
             </Box>
 
             {/* Feedback Alert */}
@@ -591,7 +670,7 @@ export default function SkillPage() {
             )}
             {!feedback && queryError && (
               <Alert
-                severity="error"
+                severity="warning"
                 sx={{ mb: 3 }}
               >
                 {queryError instanceof Error ? queryError.message : 'Query execution failed'}
@@ -642,9 +721,6 @@ export default function SkillPage() {
         {/* Theory Tab */}
         {isCurrentTab('theory') && (
           <Box sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Theory
-            </Typography>
             {renderContent(TheoryContent, 'Theory coming soon.')}
           </Box>
         )}
@@ -652,9 +728,6 @@ export default function SkillPage() {
         {/* Story Tab */}
         {isCurrentTab('story') && (
           <Box sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Story
-            </Typography>
             {renderContent(StoryContent, 'Story coming soon.')}
           </Box>
         )}
@@ -662,9 +735,6 @@ export default function SkillPage() {
         {/* Data Explorer Tab */}
         {isCurrentTab('data') && (
           <Box sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Data Explorer
-            </Typography>
             {dbReady ? (
               <DataExplorerTab schema={skillSchema} />
             ) : (
@@ -676,6 +746,33 @@ export default function SkillPage() {
         )}
       </Card>
 
+      <Dialog
+        open={showGiveUpDialog}
+        onClose={handleGiveUpCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Need a Hint?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Are you sure? You can also check out the Theory page to read more about how you might solve this Exercise.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleGiveUpCancel}>
+            Keep Trying
+          </Button>
+          <Button
+            onClick={handleGiveUpConfirm}
+            color="warning"
+            variant="contained"
+            startIcon={<Flag />}
+          >
+            Give Up
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Skill Completion Dialog */}
       <Dialog
         open={showCompletionDialog}
@@ -683,7 +780,7 @@ export default function SkillPage() {
         maxWidth="sm"
         fullWidth
         PaperProps={{
-          sx: { 
+          sx: {
             borderRadius: 3,
             border: '2px solid',
             borderColor: 'success.main',
@@ -698,7 +795,7 @@ export default function SkillPage() {
             Skill Mastered!
           </Typography>
         </DialogTitle>
-        
+
         <DialogContent sx={{ textAlign: 'center', py: 2 }}>
           <Typography variant="h6" gutterBottom>
             Congratulations!
@@ -713,14 +810,14 @@ export default function SkillPage() {
             You've demonstrated mastery of this skill and can now confidently apply it in real-world scenarios!
           </Typography>
         </DialogContent>
-        
+
         <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
           <Button
             onClick={() => setShowCompletionDialog(false)}
             variant="contained"
             size="large"
             startIcon={<CheckCircle />}
-            sx={{ 
+            sx={{
               px: 4,
               py: 1,
               borderRadius: 2,
@@ -730,22 +827,25 @@ export default function SkillPage() {
           >
             Awesome!
           </Button>
-          
+
           {/* Show story button only if hideStories is disabled and story tab is available */}
           {!hideStories && availableTabs.some(tab => tab.key === 'story') && (
             <Button
               onClick={() => {
                 setShowCompletionDialog(false);
-                const storyIndex = availableTabs.findIndex(tab => tab.key === 'story');
-                if (storyIndex >= 0) {
-                  setCurrentTab(storyIndex);
+                const storyTab = availableTabs.find(tab => tab.key === 'story');
+                if (storyTab) {
+                  setCurrentTab('story');
                   setComponentState({ tab: 'story' });
+                  const params = new URLSearchParams(searchParamsString);
+                  params.set('tab', 'story');
+                  setSearchParams(params, { replace: true });
                 }
               }}
               variant="outlined"
               size="large"
               startIcon={<MenuBook />}
-              sx={{ 
+              sx={{
                 px: 3,
                 py: 1,
                 borderRadius: 2,
@@ -756,12 +856,12 @@ export default function SkillPage() {
               See the Story
             </Button>
           )}
-          
+
           <Button
             onClick={() => navigate('/learn')}
             variant="outlined"
             size="large"
-            sx={{ 
+            sx={{
               px: 3,
               py: 1,
               borderRadius: 2,
